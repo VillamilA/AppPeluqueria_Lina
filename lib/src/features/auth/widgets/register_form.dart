@@ -97,10 +97,10 @@ class _RegisterFormState extends State<RegisterForm> {
                 filled: true,
                 fillColor: AppColors.charcoal,
                 labelText: 'Género',
-                labelStyle: const TextStyle(color: AppColors.gray),
+                labelStyle: const TextStyle(color: Color.fromARGB(255, 221, 221, 221)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.gray),
+                  borderSide: const BorderSide(color: Color.fromARGB(255, 247, 247, 247)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -137,6 +137,14 @@ class _RegisterFormState extends State<RegisterForm> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.gold, // Fondo dorado
+                  foregroundColor: Colors.black,   // Letras negras
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 onPressed: _loading
                     ? null
                     : () async {
@@ -221,6 +229,10 @@ class _RegisterFormState extends State<RegisterForm> {
             ),
             const SizedBox(height: 8),
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.gold, // Letras doradas
+                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancelar'),
             ),
