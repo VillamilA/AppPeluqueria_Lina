@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../dashboard/admin_dashboard_page.dart';
+import '../../dashboard/client_dashboard_page.dart';
+import '../../dashboard/manager_dashboard_page.dart';
+import '../../dashboard/stylist_dashboard_page.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/token_storage.dart';
@@ -6,7 +10,7 @@ import '../../../core/utils/validators.dart';
 import '../pages/register_page.dart';
 import 'email_verification_dialog.dart';
 import 'package:peluqueria_lina_app/src/widgets/custom_input_field.dart';
-import '../pages/dashboard_page.dart';
+// Eliminado import de dashboard_page.dart
 
 // LoginForm es el formulario donde el usuario ingresa sus datos para iniciar sesión
 class LoginForm extends StatefulWidget {
@@ -192,19 +196,27 @@ class _LoginFormState extends State<LoginForm> {
                               );
                               await Future.delayed(const Duration(milliseconds: 1500));
                               if (!mounted) return;
-                              // Redirigir según el rol
-                              final role = res['role'] ?? '';
+                              // Redirigir según el rol (normalizado)
+                              final userData = res['user'] ?? res;
+                              final role = (userData['role'] ?? '').toString().toUpperCase();
+                              print('Rol recibido: $role');
                               Widget dashboard;
-                              if (role == 'cliente') {
-                                dashboard = ClientDashboardPage(user: res);
-                              } else if (role == 'estilista') {
-                                dashboard = StylistDashboardPage(user: res);
-                              } else if (role == 'gerente') {
-                                dashboard = ManagerDashboardPage(user: res);
-                              } else if (role == 'admin') {
-                                dashboard = AdminDashboardPage(user: res);
+                              if (role == 'CLIENTE') {
+                                print('Redirigiendo a ClientDashboardPage');
+                                dashboard = ClientDashboardPage(user: userData);
+                              } else if (role == 'ESTILISTA') {
+                                print('Redirigiendo a StylistDashboardPage');
+                                dashboard = StylistDashboardPage(user: userData);
+                              } else if (role == 'GERENTE') {
+                                print('Redirigiendo a ManagerDashboardPage');
+                                dashboard = ManagerDashboardPage(user: userData);
+                              } else if (role == 'ADMIN') {
+                                print('Redirigiendo a AdminDashboardPage');
+                                dashboard = AdminDashboardPage(user: userData);
                               } else {
-                                dashboard = DashboardPage(user: res); // fallback
+                                print('ERROR: Rol desconocido -> "$role". Redirigiendo al login.');
+                                Navigator.of(context).pushReplacementNamed('/login');
+                                return;
                               }
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(builder: (_) => dashboard),
