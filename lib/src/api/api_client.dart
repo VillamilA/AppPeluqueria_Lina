@@ -7,9 +7,31 @@ class ApiClient {
 
   String get baseUrl => dotenv.env['API_BASE_URL'] ?? '';
 
-  Future<http.Response> post(String path, {Map<String, String>? body, Map<String, String>? headers}) async {
+  Future<http.Response> post(String path, {dynamic body, Map<String, String>? headers}) async {
     final url = Uri.parse('$baseUrl$path');
+    if (body != null && body is! String) {
+      headers = {...?headers, 'Content-Type': 'application/json'};
+      return await http.post(url, body: body is String ? body : body is Map ? body : body.toString(), headers: headers);
+    }
     return await http.post(url, body: body, headers: headers);
   }
-  // Puedes agregar métodos get, put, delete, etc. aquí
+
+  Future<http.Response> get(String path, {Map<String, String>? headers}) async {
+    final url = Uri.parse('$baseUrl$path');
+    return await http.get(url, headers: headers);
+  }
+
+  Future<http.Response> put(String path, {dynamic body, Map<String, String>? headers}) async {
+    final url = Uri.parse('$baseUrl$path');
+    if (body != null && body is! String) {
+      headers = {...?headers, 'Content-Type': 'application/json'};
+      return await http.put(url, body: body is String ? body : body is Map ? body : body.toString(), headers: headers);
+    }
+    return await http.put(url, body: body, headers: headers);
+  }
+
+  Future<http.Response> delete(String path, {Map<String, String>? headers}) async {
+    final url = Uri.parse('$baseUrl$path');
+    return await http.delete(url, headers: headers);
+  }
 }
