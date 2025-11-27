@@ -18,6 +18,7 @@ class ClientDashboardPage extends StatefulWidget {
 }
 
 class _ClientDashboardPageState extends State<ClientDashboardPage> {
+    String selectedCategoryId = '';
   int _currentTab = 0;
   String clientName = '';
   String token = '';
@@ -341,7 +342,12 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
   }
 
   Widget _buildServicesTab() {
-    return ServicesTab(user: widget.user);
+    return ServicesTab(
+      services: services,
+      categories: catalogs,
+      selectedCategoryId: selectedCategoryId,
+      onCategorySelected: (id) => setState(() => selectedCategoryId = id),
+    );
   }
 
   Widget _buildLocationTab() {
