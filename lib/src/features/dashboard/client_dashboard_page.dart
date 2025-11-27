@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:peluqueria_lina_app/src/features/dashboard/services_tab.dart';
 import 'package:peluqueria_lina_app/src/api/api_client.dart';
 import 'package:peluqueria_lina_app/src/data/services/token_storage.dart';
+import 'package:peluqueria_lina_app/src/api/catalog_api.dart';
 import '../../api/services_api.dart';
 import '../../api/stylists_api.dart';
-import '../../api/users_api.dart';
 import '../../core/theme/app_theme.dart';
 
 class ClientDashboardPage extends StatefulWidget {
@@ -30,6 +30,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     'https://images.unsplash.com/photo-1517841905240-472988babdf9',
     'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
   ];
+  List<dynamic> catalogs = [];
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
       clientName = 'Cliente';
     }
     _initDashboard();
+    _fetchCatalogs();
   }
 
   Future<void> _initDashboard() async {
@@ -61,16 +63,21 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     });
   }
 
+  Future<void> _fetchCatalogs() async {
+    final storedToken = await TokenStorage.instance.getAccessToken();
+    if (storedToken == null) return;
+    try {
+      final api = CatalogApi();
+      final result = await api.getCatalogs(storedToken);
+      setState(() {
+        catalogs = result;
+      });
+    } catch (e) {
+      print('Error al cargar catálogos: $e');
+    }
+  }
+
   Future<void> _fetchData() async {
-    // Fetch client name (opcional, ya lo tienes en widget.user)
-    // final userRes = await UsersApi(ApiClient.instance).getUser(userId, token: token);
-    // if (userRes.statusCode == 200) {
-    //   final userData = jsonDecode(userRes.body);
-    //   setState(() {
-    //     clientName = userData['user']?['name'] ?? userData['name'] ?? '';
-    //   });
-    // }
-    // Fetch services
     try {
       final servicesRes = await ServicesApi(ApiClient.instance).listServices(token: token);
       print('Respuesta servicios: status=${servicesRes.statusCode}, body=${servicesRes.body}');
@@ -84,14 +91,26 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
           errorMessage = 'Error al cargar servicios: ${servicesRes.statusCode}';
         });
       }
-      // Fetch stylists
+
+      // Fetch stylists desde la base de datos
       final stylistsRes = await StylistsApi(ApiClient.instance).listStylists(token: token);
       print('Respuesta estilistas: status=${stylistsRes.statusCode}, body=${stylistsRes.body}');
       if (stylistsRes.statusCode == 200) {
         final stylistsData = jsonDecode(stylistsRes.body);
-        setState(() {
-          stylists = stylistsData is List ? stylistsData : [];
-        });
+        // Si la respuesta es { "stylists": [...] }
+        if (stylistsData is Map && stylistsData.containsKey('stylists')) {
+          setState(() {
+            stylists = stylistsData['stylists'] ?? [];
+          });
+        } else if (stylistsData is List) {
+          setState(() {
+            stylists = stylistsData;
+          });
+        } else {
+          setState(() {
+            stylists = [];
+          });
+        }
       } else {
         setState(() {
           errorMessage = 'Error al cargar estilistas: ${stylistsRes.statusCode}';
@@ -215,24 +234,23 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
           SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Text('Servicios', style: TextStyle(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.bold)),
+            child: Text('Catálogos', style: TextStyle(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.bold)),
           ),
           SizedBox(height: 12),
-          services.isEmpty
+          catalogs.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Text('No hay servicios disponibles.', style: TextStyle(color: AppColors.gray)),
+                  child: Text('No hay categorías disponibles.', style: TextStyle(color: AppColors.gray)),
                 )
               : SizedBox(
                   height: 90,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: services.length,
+                    itemCount: catalogs.length,
                     separatorBuilder: (_, __) => SizedBox(width: 16),
                     itemBuilder: (context, i) {
-                      final service = services[i];
-                      final name = service['name'] ?? 'Servicio';
-                      final icon = service['icon'] ?? Icons.content_cut;
+                      final catalog = catalogs[i];
+                      final name = catalog['nombre'] ?? 'Catálogo';
                       return Column(
                         children: [
                           CircleAvatar(
@@ -272,8 +290,12 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                     separatorBuilder: (_, __) => SizedBox(width: 16),
                     itemBuilder: (context, i) {
                       final stylist = stylists[i];
-                      final name = stylist['name'] ?? 'Estilista';
-                      final image = stylist['image'] ?? 'https://images.unsplash.com/photo-1517841905240-472988babdf9';
+                      final nombre = stylist['nombre'] ?? '';
+                      final apellido = stylist['apellido'] ?? '';
+                      final name = (nombre.isNotEmpty || apellido.isNotEmpty)
+                          ? '$nombre $apellido'
+                          : 'Estilista';
+                      final image = stylist['image'] ?? null;
                       final rating = stylist['rating'] ?? 5.0;
                       return Container(
                         width: 110,
@@ -288,7 +310,12 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                             SizedBox(height: 10),
                             CircleAvatar(
                               radius: 32,
-                              backgroundImage: NetworkImage(image),
+                              backgroundImage: image != null && image.isNotEmpty
+                                  ? NetworkImage(image)
+                                  : null,
+                              child: image == null || image.isEmpty
+                                  ? Icon(Icons.person, color: AppColors.gold, size: 32)
+                                  : null,
                             ),
                             SizedBox(height: 8),
                             Text(name, style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -314,7 +341,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
   }
 
   Widget _buildServicesTab() {
-    return Center(child: Text('Servicios', style: TextStyle(color: AppColors.gold)));
+    return ServicesTab(user: widget.user);
   }
 
   Widget _buildLocationTab() {
