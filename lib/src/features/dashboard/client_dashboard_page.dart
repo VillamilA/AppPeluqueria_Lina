@@ -130,7 +130,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
       backgroundColor: AppColors.charcoal,
       appBar: AppBar(
         backgroundColor: AppColors.charcoal,
-        title: Text('Bienvenido, $clientName', style: TextStyle(color: AppColors.gold)),
+        title: Text('Peluquería Lina', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
         elevation: 0,
       ),
       body: isLoading
@@ -146,14 +146,14 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTab,
         onTap: (i) => setState(() => _currentTab = i),
-        backgroundColor: AppColors.charcoal,
-        selectedItemColor: AppColors.gold,
-        unselectedItemColor: AppColors.gray,
+        backgroundColor: AppColors.gold,
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.black,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.content_cut), label: 'Servicios'),
-          BottomNavigationBarItem(icon: Icon(Icons.location_on), label: 'Ubicación'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
+          BottomNavigationBarItem(icon: Icon(Icons.home, color: Colors.black), label: 'Inicio'),
+          BottomNavigationBarItem(icon: Icon(Icons.content_cut, color: Colors.black), label: 'Servicios'),
+          BottomNavigationBarItem(icon: Icon(Icons.location_on, color: Colors.black), label: 'Ubicación'),
+          BottomNavigationBarItem(icon: Icon(Icons.person, color: Colors.black), label: 'Perfil'),
         ],
       ),
     );
@@ -307,25 +307,25 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            SizedBox(height: 10),
+                            SizedBox(height: 6),
                             CircleAvatar(
-                              radius: 32,
+                              radius: 22,
                               backgroundImage: image != null && image.isNotEmpty
                                   ? NetworkImage(image)
                                   : null,
                               child: image == null || image.isEmpty
-                                  ? Icon(Icons.person, color: AppColors.gold, size: 32)
+                                  ? Icon(Icons.person, color: AppColors.gold, size: 18)
                                   : null,
                             ),
-                            SizedBox(height: 8),
-                            Text(name, style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 14)),
-                            SizedBox(height: 4),
+                            SizedBox(height: 2),
+                            Text(name, style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 11)),
+                            SizedBox(height: 2),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(5, (star) => Icon(
                                 Icons.star,
                                 color: star < rating ? AppColors.gold : AppColors.gray,
-                                size: 16,
+                                size: 11,
                               )),
                             ),
                           ],
