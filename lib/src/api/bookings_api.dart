@@ -2,11 +2,20 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class BookingsApi {
+    Future<http.Response> getSlots({
+        required String stylistId,
+        required String serviceId,
+        required String dayOfWeek,
+        String? token,
+    }) async {
+        final path = '/api/v1/slots?stylistId=$stylistId&serviceId=$serviceId&dayOfWeek=$dayOfWeek';
+        return await _client.get(path, headers: token != null ? {'Authorization': 'Bearer $token'} : null);
+    }
   final ApiClient _client;
   BookingsApi(this._client);
 
-  Future<http.Response> createBooking(Map<String, dynamic> data) async =>
-      await _client.post('/api/v1/bookings', body: data);
+  Future<http.Response> createBooking(Map<String, dynamic> data, {required String token}) async =>
+      await _client.post('/api/v1/bookings', body: data, headers: {'Authorization': 'Bearer $token'});
 
   Future<http.Response> getClientBookings(String status) async =>
       await _client.get('/api/v1/bookings/myclient?status=$status');
