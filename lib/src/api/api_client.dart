@@ -1,5 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class ApiClient {
   static final ApiClient instance = ApiClient._();
@@ -11,7 +12,8 @@ class ApiClient {
     final url = Uri.parse('$baseUrl$path');
     if (body != null && body is! String) {
       headers = {...?headers, 'Content-Type': 'application/json'};
-      return await http.post(url, body: body is String ? body : body is Map ? body : body.toString(), headers: headers);
+      final jsonBody = body is Map ? jsonEncode(body) : body.toString();
+      return await http.post(url, body: jsonBody, headers: headers);
     }
     return await http.post(url, body: body, headers: headers);
   }
@@ -25,7 +27,8 @@ class ApiClient {
     final url = Uri.parse('$baseUrl$path');
     if (body != null && body is! String) {
       headers = {...?headers, 'Content-Type': 'application/json'};
-      return await http.put(url, body: body is String ? body : body is Map ? body : body.toString(), headers: headers);
+      final jsonBody = body is Map ? jsonEncode(body) : body.toString();
+      return await http.put(url, body: jsonBody, headers: headers);
     }
     return await http.put(url, body: body, headers: headers);
   }
