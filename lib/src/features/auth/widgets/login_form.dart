@@ -198,8 +198,17 @@ class _LoginFormState extends State<LoginForm> {
                               if (!mounted) return;
                               // Redirigir según el rol (normalizado)
                               final userData = res['user'] ?? res;
+                              final token = res['accessToken'] ?? '';
+                              print('🔐 Token del login: $token');
+                              print('🔐 userData recibido: $userData');
+                              
+                              // Agregar token a userData para que se pase a los dashboards
+                              userData['accessToken'] = token;
+                              userData['token'] = token;
+                              
                               final role = (userData['role'] ?? '').toString().toUpperCase();
                               print('Rol recibido: $role');
+                              print('🔑 Token en userData ahora: ${userData['accessToken'] ?? userData['token'] ?? "NO ENCONTRADO"}');
                               Widget dashboard;
                               if (role == 'CLIENTE') {
                                 print('Redirigiendo a ClientDashboardPage');
