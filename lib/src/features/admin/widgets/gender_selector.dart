@@ -6,10 +6,10 @@ class GenderSelector extends StatefulWidget {
   final Function(String) onChanged;
 
   const GenderSelector({
-    Key? key,
+    super.key,
     required this.initialValue,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<GenderSelector> createState() => _GenderSelectorState();

@@ -1,4 +1,5 @@
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'api_client.dart';
 
 class StylistBookingsApi {
@@ -26,10 +27,11 @@ class StylistBookingsApi {
         headers: {'Authorization': 'Bearer $token'},
       );
 
-  /// Cancelar una reserva
-  Future<http.Response> cancelBooking(String bookingId, String token) async =>
+  /// Cancelar una reserva con motivo
+  Future<http.Response> cancelBooking(String bookingId, String token, {String? motivo}) async =>
       await _client.post(
         '/api/v1/bookings/$bookingId/cancel',
         headers: {'Authorization': 'Bearer $token'},
+        body: motivo != null ? jsonEncode({'motivo': motivo}) : null,
       );
 }

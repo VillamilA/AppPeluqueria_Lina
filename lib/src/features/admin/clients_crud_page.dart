@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
+import '../../api/users_api.dart';
+import '../../data/services/verification_service.dart';
 import 'dart:convert';
 import '../../core/theme/app_theme.dart';
 import 'admin_constants.dart';
-import 'widgets/gender_selector.dart';
+import 'pages/client_form_page.dart';
 
 class ClientsCrudPage extends StatefulWidget {
   final String token;
@@ -16,10 +18,12 @@ class ClientsCrudPage extends StatefulWidget {
 class _ClientsCrudPageState extends State<ClientsCrudPage> {
   List<dynamic> clients = [];
   bool loading = true;
+  late UsersApi _usersApi;
 
   @override
   void initState() {
     super.initState();
+    _usersApi = UsersApi(ApiClient.instance);
     _fetchClients();
   }
 
@@ -46,23 +50,23 @@ class _ClientsCrudPageState extends State<ClientsCrudPage> {
         print('📦 Data type: ${data.runtimeType}');
         print('🔎 Has "data" key: ${data is Map && data.containsKey('data')}');
         
-        final clients_list = (data is List)
+        final clientsList = (data is List)
           ? data
           : (data['data'] is List ? data['data'] : []);
         
-        print('👥 Clients count: ${clients_list.length}');
-        print('📝 Clients: $clients_list');
+        print('👥 Clients count: ${clientsList.length}');
+        print('📝 Clients: $clientsList');
         
         // Verificar roles en la lista
-        if (clients_list.isNotEmpty) {
-          for (int i = 0; i < clients_list.length; i++) {
-            final client = clients_list[i];
+        if (clientsList.isNotEmpty) {
+          for (int i = 0; i < clientsList.length; i++) {
+            final client = clientsList[i];
             print('  Cliente $i - Role: ${client['role']}, Nombre: ${client['nombre']}');
           }
         }
         
         setState(() {
-          clients = clients_list;
+          clients = clientsList;
           loading = false;
         });
       } else {
@@ -85,6 +89,15 @@ class _ClientsCrudPageState extends State<ClientsCrudPage> {
         headers: {'Authorization': 'Bearer ${widget.token}', 'Content-Type': 'application/json'},
       );
       if (res.statusCode == 201 || res.statusCode == 200) {
+        // Enviar email de verificación al cliente
+        try {
+          await VerificationService.instance.sendVerificationEmail(client['email']);
+          print('✅ Email de verificación enviado a ${client['email']}');
+        } catch (e) {
+          print('⚠️ No se pudo enviar email de verificación: $e');
+          // Continuar aunque falle el email
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cliente creado exitosamente'), backgroundColor: Colors.green));
         await _fetchClients();
       } else {
@@ -118,132 +131,53 @@ class _ClientsCrudPageState extends State<ClientsCrudPage> {
     }
   }
 
-  Future<void> _deleteClient(String id) async {
+  Future<void> _toggleClientStatus(String id, bool currentStatus) async {
     setState(() { loading = true; });
     try {
-      final res = await ApiClient.instance.delete(
-        '/api/v1/users/$id',
-        headers: {'Authorization': 'Bearer ${widget.token}'},
+      final res = await _usersApi.updateUserStatus(
+        id,
+        !currentStatus,
+        token: widget.token,
       );
       if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cliente eliminado exitosamente'), backgroundColor: Colors.green));
-        await _fetchClients();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar cliente'), backgroundColor: Colors.red));
-        setState(() { loading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(!currentStatus ? 'Cliente activado' : 'Cliente desactivado'),
+            backgroundColor: AppColors.gold,
+          ),
+        );
+        _fetchClients();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      print('Error toggling client status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
       setState(() { loading = false; });
     }
   }
 
   void _showClientForm({Map<String, dynamic>? client, required bool isEdit}) {
-    final nombreCtrl = TextEditingController(text: client?['nombre'] ?? '');
-    final apellidoCtrl = TextEditingController(text: client?['apellido'] ?? '');
-    final cedulaCtrl = TextEditingController(text: client?['cedula'] ?? '');
-    final telefonoCtrl = TextEditingController(text: client?['telefono'] ?? '');
-    String selectedGender = client?['genero'] ?? 'M';
-    final emailCtrl = TextEditingController(text: client?['email'] ?? '');
-    final passwordCtrl = TextEditingController(text: client?['password'] ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: AppColors.charcoal,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(isEdit ? 'Editar Cliente' : 'Crear Cliente', style: TextStyle(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.bold)),
-                SizedBox(height: 20),
-                _buildTextField(nombreCtrl, 'Nombre', Icons.person),
-                SizedBox(height: 12),
-                _buildTextField(apellidoCtrl, 'Apellido', Icons.person_outline),
-                SizedBox(height: 12),
-                _buildTextField(cedulaCtrl, 'Cédula', Icons.credit_card),
-                SizedBox(height: 12),
-                _buildTextField(telefonoCtrl, 'Teléfono', Icons.phone),
-                SizedBox(height: 12),
-                Text('Género', style: TextStyle(color: AppColors.gray, fontSize: 14)),
-                SizedBox(height: 8),
-                StatefulBuilder(
-                  builder: (context, setState) => GenderSelector(
-                    initialValue: selectedGender,
-                    onChanged: (value) {
-                      selectedGender = value;
-                    },
-                  ),
-                ),
-                SizedBox(height: 12),
-                _buildTextField(emailCtrl, 'Email', Icons.email),
-                SizedBox(height: 12),
-                _buildTextField(passwordCtrl, 'Contraseña', Icons.lock, isPassword: true),
-                SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.gray,
-                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      child: Text('Cancelar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.gold,
-                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      child: Text(isEdit ? 'Guardar' : 'Crear', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                      onPressed: () async {
-                        final data = FormBuilder.buildClientData(
-                          nombre: nombreCtrl.text,
-                          apellido: apellidoCtrl.text,
-                          cedula: cedulaCtrl.text,
-                          telefono: telefonoCtrl.text,
-                          genero: selectedGender,
-                          email: emailCtrl.text,
-                          password: passwordCtrl.text,
-                        );
-                        Navigator.of(ctx).pop();
-                        if (isEdit && client != null) {
-                          await _editClient(client['_id'], data);
-                        } else {
-                          await _createClient(data);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ClientFormPage(
+          token: widget.token,
+          client: client,
+          isEdit: isEdit,
+          onSave: (data) async {
+            if (isEdit && client != null) {
+              await _editClient(client['_id'], data);
+            } else {
+              await _createClient(data);
+            }
+          },
         ),
       ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isPassword = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      style: TextStyle(color: AppColors.gold),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.gray),
-        prefixIcon: Icon(icon, color: AppColors.gold),
-        filled: true,
-        fillColor: Colors.black26,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.gold)),
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -277,20 +211,25 @@ class _ClientsCrudPageState extends State<ClientsCrudPage> {
                             Text('Teléfono: ${c['telefono'] ?? 'N/A'}', style: TextStyle(color: AppColors.gray, fontSize: 14)),
                             SizedBox(height: 12),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Estado', style: TextStyle(color: AppColors.gold, fontSize: 12)),
+                                    Switch(
+                                      value: c['isActive'] ?? true,
+                                      onChanged: (value) => _toggleClientStatus(c['_id'], c['isActive'] ?? true),
+                                      activeThumbColor: Colors.green,
+                                      inactiveThumbColor: Colors.grey,
+                                    ),
+                                  ],
+                                ),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
                                   icon: Icon(Icons.edit, color: Colors.black),
                                   label: Text('Editar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                                   onPressed: () => _showClientForm(client: c, isEdit: true),
-                                ),
-                                SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                  icon: Icon(Icons.delete, color: Colors.white),
-                                  label: Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  onPressed: () => _deleteClient(c['_id']),
                                 ),
                               ],
                             ),

@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:peluqueria_lina_app/src/features/dashboard/services_tab.dart';
+import 'package:peluqueria_lina_app/src/features/dashboard/my_bookings_tab.dart';
+import 'package:peluqueria_lina_app/src/features/dashboard/my_ratings_tab.dart';
 import 'package:peluqueria_lina_app/src/api/api_client.dart';
 import 'package:peluqueria_lina_app/src/data/services/token_storage.dart';
 import 'package:peluqueria_lina_app/src/api/catalog_api.dart';
+import 'package:peluqueria_lina_app/src/features/booking/rating_dialog.dart';
 import '../../api/services_api.dart';
 import '../../api/stylists_api.dart';
+import '../../api/bookings_api.dart';
+import '../../api/ratings_api.dart';
 import '../../core/theme/app_theme.dart';
 
 class ClientDashboardPage extends StatefulWidget {
   final Map<String, dynamic> user;
-  const ClientDashboardPage({Key? key, required this.user}) : super(key: key);
+  const ClientDashboardPage({super.key, required this.user});
 
   @override
   State<ClientDashboardPage> createState() => _ClientDashboardPageState();
@@ -54,6 +59,8 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
         token = storedToken;
       });
       await _fetchData();
+      // Verificar citas completadas sin calificar
+      await _checkUnratedCompletedBookings();
     } else {
       setState(() {
         errorMessage = 'No se encontró el token de autenticación.';
@@ -125,6 +132,143 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     }
   }
 
+  Future<void> _checkUnratedCompletedBookings() async {
+    try {
+      print('🟢 [CHECK_RATINGS] Iniciando verificación de citas sin calificar...');
+      
+      // Obtener citas del cliente
+      final bookingsRes = await BookingsApi(ApiClient.instance).getClientBookings(token);
+      if (bookingsRes.statusCode != 200) {
+        print('❌ [CHECK_RATINGS] Error al obtener citas: ${bookingsRes.statusCode}');
+        return;
+      }
+
+      final bookingsData = jsonDecode(bookingsRes.body);
+      final bookings = bookingsData is List ? bookingsData : (bookingsData['data'] ?? []);
+      print('📋 [CHECK_RATINGS] Total de citas: ${bookings.length}');
+
+      // Filtrar citas completadas
+      final completedBookings = bookings.where((b) => (b['estado'] ?? '').toUpperCase() == 'COMPLETED').toList();
+      print('✅ [CHECK_RATINGS] Citas completadas: ${completedBookings.length}');
+
+      if (completedBookings.isEmpty) {
+        print('ℹ️  [CHECK_RATINGS] No hay citas completadas');
+        return;
+      }
+
+      // Obtener calificaciones del cliente
+      final ratingsRes = await RatingsApi(ApiClient.instance).getMyRatings(token);
+      if (ratingsRes.statusCode != 200) {
+        print('❌ [CHECK_RATINGS] Error al obtener calificaciones: ${ratingsRes.statusCode}');
+        return;
+      }
+
+      final ratingsData = jsonDecode(ratingsRes.body);
+      final ratings = ratingsData is List ? ratingsData : (ratingsData['data'] ?? []);
+      print('⭐ [CHECK_RATINGS] Total de calificaciones: ${ratings.length}');
+
+      // Obtener IDs de booking que ya tienen calificación
+      final ratedBookingIds = ratings.map((r) => r['bookingId'] is Map ? r['bookingId']['_id'] : r['bookingId']).toSet();
+      print('📍 [CHECK_RATINGS] Booking IDs calificados: $ratedBookingIds');
+
+      // Encontrar citas completadas sin calificar
+      final unratedBookings = completedBookings.where((b) => !ratedBookingIds.contains(b['_id'])).toList();
+      print('🎯 [CHECK_RATINGS] Citas sin calificar: ${unratedBookings.length}');
+
+      if (unratedBookings.isEmpty) {
+        print('✔️  [CHECK_RATINGS] Todas las citas completadas han sido calificadas');
+        return;
+      }
+
+      // Mostrar diálogo para la primera cita sin calificar
+      if (mounted && unratedBookings.isNotEmpty) {
+        final booking = unratedBookings.first;
+        _showRatingPrompt(booking);
+      }
+    } catch (e, st) {
+      print('❌ [CHECK_RATINGS] Error: $e');
+      print('   Stack: $st');
+    }
+  }
+
+  void _showRatingPrompt(dynamic booking) {
+    final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
+    final estilistaNombre = '${booking['estilistaNombre'] ?? ''} ${booking['estilistaApellido'] ?? ''}';
+    final bookingId = booking['_id'] ?? '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: AppColors.charcoal,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.star_outline, color: AppColors.gold, size: 48),
+              SizedBox(height: 16),
+              Text(
+                '¿Califica este servicio?',
+                style: TextStyle(
+                  color: AppColors.gold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 12),
+              Text(
+                servicioNombre,
+                style: TextStyle(color: AppColors.gray, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                'con $estilistaNombre',
+                style: TextStyle(color: AppColors.gray, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Después'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.gold,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      showDialog(
+                        context: context,
+                        builder: (_) => RatingDialog(
+                          bookingId: bookingId,
+                          stylistName: estilistaNombre.trim(),
+                          serviceName: servicioNombre,
+                          token: token,
+                        ),
+                      );
+                    },
+                    child: Text('Calificar ahora'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,9 +294,12 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
         backgroundColor: AppColors.gold,
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.black,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home, color: Colors.black), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.content_cut, color: Colors.black), label: 'Servicios'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today, color: Colors.black), label: 'Mis Citas'),
+          BottomNavigationBarItem(icon: Icon(Icons.star, color: Colors.black), label: 'Calificaciones'),
           BottomNavigationBarItem(icon: Icon(Icons.location_on, color: Colors.black), label: 'Ubicación'),
           BottomNavigationBarItem(icon: Icon(Icons.person, color: Colors.black), label: 'Perfil'),
         ],
@@ -167,8 +314,12 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
       case 1:
         return _buildServicesTab();
       case 2:
-        return _buildLocationTab();
+        return MyBookingsTab(token: token);
       case 3:
+        return MyRatingsTab(token: token);
+      case 4:
+        return _buildLocationTab();
+      case 5:
         return _buildProfileTab();
       default:
         return Container();
@@ -296,7 +447,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                       final name = (nombre.isNotEmpty || apellido.isNotEmpty)
                           ? '$nombre $apellido'
                           : 'Estilista';
-                      final image = stylist['image'] ?? null;
+                      final image = stylist['image'];
                       final rating = stylist['rating'] ?? 5.0;
                       return Container(
                         width: 110,
@@ -347,6 +498,9 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
       categories: catalogs,
       selectedCategoryId: selectedCategoryId,
       onCategorySelected: (id) => setState(() => selectedCategoryId = id),
+      stylists: stylists,
+      clienteId: userId,
+      token: token,
     );
   }
 

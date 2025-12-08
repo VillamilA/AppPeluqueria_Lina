@@ -29,4 +29,18 @@ class RatingsApi {
       headers: token != null ? {'Authorization': 'Bearer $token'} : null,
     );
   }
+
+  Future<http.Response> getReceivedRatings(String token) async {
+    return await _client.get(
+      '/api/v1/ratings/received',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  Future<http.Response> getMyRatings(String token) async {
+    return await _client.get(
+      '/api/v1/ratings/my',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
 }

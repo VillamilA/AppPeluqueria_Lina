@@ -17,8 +17,8 @@ class BookingsApi {
   Future<http.Response> createBooking(Map<String, dynamic> data, {required String token}) async =>
       await _client.post('/api/v1/bookings', body: data, headers: {'Authorization': 'Bearer $token'});
 
-  Future<http.Response> getClientBookings(String status) async =>
-      await _client.get('/api/v1/bookings/myclient?status=$status');
+  Future<http.Response> getClientBookings(String token) async =>
+      await _client.get('/api/v1/bookings/me', headers: {'Authorization': 'Bearer $token'});
 
   Future<http.Response> getStylistBookings(String status) async =>
       await _client.get('/api/v1/bookings/mystyle?status=$status');
@@ -38,6 +38,9 @@ class BookingsApi {
   Future<http.Response> completeBooking(String bookingId) async =>
       await _client.post('/api/v1/bookings/$bookingId/complete');
 
-  Future<http.Response> cancelBooking(String bookingId) async =>
-      await _client.post('/api/v1/bookings/$bookingId/cancel');
+  Future<http.Response> cancelBooking(String bookingId, {Map<String, dynamic>? data, String? token}) async =>
+      await _client.post('/api/v1/bookings/$bookingId/cancel', body: data, headers: token != null ? {'Authorization': 'Bearer $token'} : null);
+
+  Future<http.Response> rescheduleBooking(String bookingId, {required Map<String, dynamic> data, required String token}) async =>
+      await _client.put('/api/v1/bookings/$bookingId/reschedule', body: data, headers: {'Authorization': 'Bearer $token'});
 }

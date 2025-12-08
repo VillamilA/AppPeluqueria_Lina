@@ -10,6 +10,7 @@ class CustomInputField extends StatelessWidget {
     this.obscureText = false,
     this.textInputAction,
     this.validator,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -18,6 +19,7 @@ class CustomInputField extends StatelessWidget {
   final bool obscureText;
   final TextInputAction? textInputAction;
   final String? Function(String?)? validator;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +39,7 @@ class CustomInputField extends StatelessWidget {
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: AppColors.charcoal,
         labelStyle: const TextStyle(color: AppColors.gray),

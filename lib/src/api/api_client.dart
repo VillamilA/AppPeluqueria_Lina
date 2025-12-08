@@ -37,4 +37,14 @@ class ApiClient {
     final url = Uri.parse('$baseUrl$path');
     return await http.delete(url, headers: headers);
   }
+
+  Future<http.Response> patch(String path, {dynamic body, Map<String, String>? headers}) async {
+    final url = Uri.parse('$baseUrl$path');
+    if (body != null && body is! String) {
+      headers = {...?headers, 'Content-Type': 'application/json'};
+      final jsonBody = body is Map ? jsonEncode(body) : body.toString();
+      return await http.patch(url, body: jsonBody, headers: headers);
+    }
+    return await http.patch(url, body: body, headers: headers);
+  }
 }

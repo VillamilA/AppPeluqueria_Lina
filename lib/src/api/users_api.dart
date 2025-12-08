@@ -13,4 +13,21 @@ class UsersApi {
 
   Future<http.Response> updateUser(String userId, Map<String, dynamic> data) async =>
       await _client.put('/api/v1/users/$userId/update', body: data);
+
+  Future<http.Response> getUsersByRole(String role, {String? token}) async =>
+      await _client.get(
+        '/api/v1/users?role=$role',
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      );
+
+  Future<http.Response> updateUserStatus(
+    String userId,
+    bool isActive, {
+    required String token,
+  }) async =>
+      await _client.patch(
+        '/api/v1/users/$userId/status',
+        body: {'isActive': isActive},
+        headers: {'Authorization': 'Bearer $token'},
+      );
 }

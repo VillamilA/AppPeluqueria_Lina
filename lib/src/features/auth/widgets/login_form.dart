@@ -8,9 +8,9 @@ import '../../../data/services/auth_service.dart';
 import '../../../data/services/token_storage.dart';
 import '../../../core/utils/validators.dart';
 import '../pages/register_page.dart';
-import 'email_verification_dialog.dart';
+import '../dialogs/unverified_email_dialog.dart';
+import '../../common/dialogs/app_dialogs.dart';
 import 'package:peluqueria_lina_app/src/widgets/custom_input_field.dart';
-// Eliminado import de dashboard_page.dart
 
 // LoginForm es el formulario donde el usuario ingresa sus datos para iniciar sesión
 class LoginForm extends StatefulWidget {
@@ -127,6 +127,7 @@ class _LoginFormState extends State<LoginForm> {
                                 password: _passCtrl.text,
                               );
                               print('Respuesta login: $res');
+                              
                               // El JSON de login tiene los datos directamente, no en res.user
                               final isEmailVerified =
                                   res['emailVerified'] ??
@@ -134,6 +135,7 @@ class _LoginFormState extends State<LoginForm> {
                                   res['email_verified'] ??
                                   res['verified'] ??
                                   true;
+                              
                               if (isEmailVerified == false) {
                                 setState(() => _loading = false);
                                 if (!mounted) return;
@@ -150,105 +152,83 @@ class _LoginFormState extends State<LoginForm> {
                                 showDialog(
                                   context: context,
                                   barrierDismissible: false,
-                                  builder: (context) => EmailVerificationDialog(
+                                  builder: (context) => UnverifiedEmailDialog(
                                     email: _emailCtrl.text.trim(),
-                                    isAfterRegistration: false,
+                                    token: res['accessToken'] ?? '',
                                   ),
                                 );
                                 return;
                               }
+                              
                               // Guardar los tokens de acceso
                               await TokenStorage.instance.saveTokens(
                                 accessToken: res['accessToken'],
                                 refreshToken: res['refreshToken'] ?? '',
                               );
                               if (!mounted) return;
-                              // Mostrar check de éxito
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => Dialog(
-                                  backgroundColor: Colors.transparent,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(32),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.charcoal,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.gold,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.check, color: Colors.black, size: 32),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Text('¡Acceso exitoso!', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                              await Future.delayed(const Duration(milliseconds: 1500));
-                              if (!mounted) return;
-                              // Redirigir según el rol (normalizado)
-                              final userData = res['user'] ?? res;
-                              final token = res['accessToken'] ?? '';
-                              print('🔐 Token del login: $token');
-                              print('🔐 userData recibido: $userData');
                               
-                              // Agregar token a userData para que se pase a los dashboards
-                              userData['accessToken'] = token;
-                              userData['token'] = token;
-                              
-                              final role = (userData['role'] ?? '').toString().toUpperCase();
-                              print('Rol recibido: $role');
-                              print('🔑 Token en userData ahora: ${userData['accessToken'] ?? userData['token'] ?? "NO ENCONTRADO"}');
-                              Widget dashboard;
-                              if (role == 'CLIENTE') {
-                                print('Redirigiendo a ClientDashboardPage');
-                                dashboard = ClientDashboardPage(user: userData);
-                              } else if (role == 'ESTILISTA') {
-                                print('Redirigiendo a StylistDashboardPage');
-                                dashboard = StylistDashboardPage(user: userData);
-                              } else if (role == 'GERENTE') {
-                                print('Redirigiendo a ManagerDashboardPage');
-                                dashboard = ManagerDashboardPage(user: userData);
-                              } else if (role == 'ADMIN') {
-                                print('Redirigiendo a AdminDashboardPage');
-                                dashboard = AdminDashboardPage(user: userData);
-                              } else {
-                                print('ERROR: Rol desconocido -> "$role". Redirigiendo al login.');
-                                Navigator.of(context).pushReplacementNamed('/login');
-                                return;
-                              }
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (_) => dashboard),
-                                (route) => false,
+                              // Mostrar éxito con diálogo centralizado
+                              AppDialogHelper.showSuccess(
+                                context,
+                                title: '¡Acceso exitoso!',
+                                message: 'Bienvenido a Peluquería Lina',
+                                onAccept: () {
+                                  // Redirigir según el rol
+                                  _redirectToDashboard(res);
+                                },
                               );
                             } catch (e) {
+                              setState(() => _loading = false);
                               if (!mounted) return;
-                              // Mostrar error en SnackBar
+                              
+                              // Convertir error a string
                               String errorMsg = e.toString();
                               if (errorMsg.startsWith('Exception: ')) {
                                 errorMsg = errorMsg.substring(11);
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(errorMsg),
-                                  backgroundColor: Colors.red.shade800,
-                                  behavior: SnackBarBehavior.floating,
-                                  margin: const EdgeInsets.all(16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              
+                              print('[LOGIN_ERROR] $errorMsg');
+                              
+                              // Detectar si es error de email no verificado
+                              final isEmailNotVerified = errorMsg.toLowerCase().contains('correo') || 
+                                                        errorMsg.toLowerCase().contains('email') ||
+                                                        errorMsg.toLowerCase().contains('verif') ||
+                                                        errorMsg.contains('Confirme primero');
+                              
+                              if (isEmailNotVerified) {
+                                // Mostrar diálogo de email no verificado
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => UnverifiedEmailDialog(
+                                    email: _emailCtrl.text.trim(),
+                                    token: '',  // Sin token, se pedirá reenviar
                                   ),
-                                ),
-                              );
+                                );
+                                return;
+                              }
+                              
+                              // Detectar si es error de credenciales inválidas
+                              final isInvalidCredentials = errorMsg.toLowerCase().contains('credenciales') ||
+                                                          errorMsg.toLowerCase().contains('usuario') ||
+                                                          errorMsg.toLowerCase().contains('contraseña') ||
+                                                          errorMsg.toLowerCase().contains('password') ||
+                                                          errorMsg.toLowerCase().contains('incorrectos') ||
+                                                          errorMsg.toLowerCase().contains('invalid');
+                              
+                              if (isInvalidCredentials) {
+                                AppDialogHelper.showError(
+                                  context,
+                                  title: 'Credenciales Inválidas',
+                                  message: 'Usuario o contraseña incorrectos. Por favor intenta nuevamente.',
+                                );
+                              } else {
+                                AppDialogHelper.showError(
+                                  context,
+                                  title: 'Error de Conexión',
+                                  message: errorMsg.isEmpty ? 'Error al iniciar sesión' : errorMsg,
+                                );
+                              }
                             } finally {
                               if (mounted) setState(() => _loading = false);
                             }
@@ -305,6 +285,50 @@ class _LoginFormState extends State<LoginForm> {
           ),
         ],
       ),
+    );
+  }
+
+  void _redirectToDashboard(Map<String, dynamic> res) {
+    // Redirigir según el rol (normalizado)
+    final userData = res['user'] ?? res;
+    final token = res['accessToken'] ?? '';
+    print('🔐 Token del login: $token');
+    print('🔐 userData recibido: $userData');
+    
+    // Agregar token a userData para que se pase a los dashboards
+    userData['accessToken'] = token;
+    userData['token'] = token;
+    
+    final role = (userData['role'] ?? '').toString().toUpperCase().trim();
+    print('✅ Rol normalizado: "$role"');
+    print('🔑 Token en userData ahora: ${userData['accessToken'] ?? userData['token'] ?? "NO ENCONTRADO"}');
+    
+    Widget dashboard;
+    if (role == 'CLIENTE') {
+      print('➡️ Redirigiendo a ClientDashboardPage');
+      dashboard = ClientDashboardPage(user: userData);
+    } else if (role == 'ESTILISTA') {
+      print('➡️ Redirigiendo a StylistDashboardPage');
+      dashboard = StylistDashboardPage(user: userData);
+    } else if (role == 'GERENTE') {
+      print('➡️ Redirigiendo a ManagerDashboardPage');
+      dashboard = ManagerDashboardPage(user: userData);
+    } else if (role == 'ADMIN') {
+      print('➡️ Redirigiendo a AdminDashboardPage');
+      dashboard = AdminDashboardPage(user: userData);
+    } else {
+      print('❌ ERROR: Rol desconocido: "$role". Redirigiendo al login.');
+      AppDialogHelper.showError(
+        context,
+        title: 'Error',
+        message: 'Rol no reconocido. Por favor contacta soporte.',
+      );
+      return;
+    }
+    
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => dashboard),
+      (route) => false,
     );
   }
 }

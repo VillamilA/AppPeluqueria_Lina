@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:peluqueria_lina_app/src/widgets/custom_input_field.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/email_service.dart';
 import '../../../core/utils/validators.dart';
-import 'email_verification_dialog.dart';
+import '../dialogs/verify_email_dialog.dart';
 
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
@@ -87,7 +86,7 @@ class _RegisterFormState extends State<RegisterForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _genero,
+              initialValue: _genero,
               items: const [
                 DropdownMenuItem(value: 'M', child: Text('Género: Masculino')),
                 DropdownMenuItem(value: 'F', child: Text('Género: Femenino')),
@@ -151,7 +150,7 @@ class _RegisterFormState extends State<RegisterForm> {
                         if (!(_formKey.currentState?.validate() ?? false)) return;
                         setState(() => _loading = true);
                         try {
-                          await AuthService.instance.register({
+                          final res = await AuthService.instance.register({
                             'nombre': _nombreCtrl.text.trim(),
                             'apellido': _apellidoCtrl.text.trim(),
                             'cedula': _cedulaCtrl.text.trim(),
@@ -160,11 +159,15 @@ class _RegisterFormState extends State<RegisterForm> {
                             'email': _correoCtrl.text.trim(),
                             'password': _passCtrl.text,
                           });
-                          try {
-                            await EmailService.instance.sendVerificationEmail(_correoCtrl.text.trim());
-                          } catch (e) {
-                            print('Warning: No se pudo enviar correo de verificación: $e');
+
+                          // Extraer token de la respuesta
+                          String token = '';
+                          if (res is Map && res.containsKey('token')) {
+                            token = res['token'] ?? '';
+                          } else if (res is String) {
+                            token = res;
                           }
+
                           if (!mounted) return;
                           showDialog(
                             context: context,
@@ -202,9 +205,9 @@ class _RegisterFormState extends State<RegisterForm> {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => EmailVerificationDialog(
+                                builder: (context) => VerifyEmailDialog(
                                   email: _correoCtrl.text.trim(),
-                                  isAfterRegistration: true,
+                                  token: token,
                                 ),
                               );
                             }
