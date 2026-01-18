@@ -39,7 +39,20 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   carousel_slider: ^5.1.1
   intl: ^0.20.2
+  image_picker: ^1.0.4
+  flutter_local_notifications: ^18.0.1
+  permission_handler: ^11.3.1
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  url_launcher: ^6.2.2
+  geolocator: ^11.0.0
+  fl_chart: ^0.65.0
+  path_provider: ^2.1.1
+  open_file: ^3.3.2
+  flutter_rating_bar: ^4.0.1
+  provider: ^6.1.5+1
 
+  http_parser: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +71,8 @@ dev_dependencies:
 flutter:
   assets:
     - .env
+    - assets/images/carousel/
+    - assets/images/icons/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

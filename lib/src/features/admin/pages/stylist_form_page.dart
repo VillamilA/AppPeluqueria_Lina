@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import '../../../api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../common/dialogs/app_dialogs.dart';
 import '../admin_constants.dart';
 import '../widgets/gender_selector.dart';
-import '../dialogs/catalog_form_dialog.dart';
+import 'stylist_catalogs_page.dart';
 
 class StylistFormPage extends StatefulWidget {
   final String token;
@@ -23,20 +23,20 @@ class StylistFormPage extends StatefulWidget {
   State<StylistFormPage> createState() => _StylistFormPageState();
 }
 
-class _StylistFormPageState extends State<StylistFormPage> {
+class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProviderStateMixin {
   late TextEditingController nombreCtrl;
   late TextEditingController apellidoCtrl;
   late TextEditingController cedulaCtrl;
   late TextEditingController telefonoCtrl;
   late TextEditingController emailCtrl;
   late TextEditingController passwordCtrl;
+  late TextEditingController confirmPasswordCtrl;
   late TextEditingController edadCtrl;
   late String selectedGender;
+  late AnimationController _animController;
+  late Animation<double> _fadeAnimation;
 
-  // Catalogs
-  List<dynamic> _catalogs = [];
-  List<String> _selectedCatalogs = [];
-  bool _loadingCatalogs = true;
+  // Catalogs management is now in separate page
 
   // Schedule (work hours)
   final Map<String, List<String>> _workSchedule = {
@@ -75,155 +75,23 @@ class _StylistFormPageState extends State<StylistFormPage> {
       emailCtrl = TextEditingController(text: widget.stylist?['email']?.toString() ?? '');
       // En edición NO precargar password
       passwordCtrl = TextEditingController(text: widget.isEdit ? '' : (widget.stylist?['password']?.toString() ?? ''));
+      confirmPasswordCtrl = TextEditingController(text: '');
       edadCtrl = TextEditingController(text: widget.stylist?['edad']?.toString() ?? '');
       selectedGender = widget.stylist?['genero']?.toString() ?? 'F';
       
-      // Solo cargar catalogs si estamos creando, no editando
-      // catalogs puede ser List<String> (IDs) o List<Map> (objetos completos)
-      if (widget.stylist?['catalogs'] != null && widget.stylist!['catalogs'] is List) {
-        final catalogsList = widget.stylist!['catalogs'] as List;
-        _selectedCatalogs = catalogsList
-            .map((catalog) {
-              // Si es un Map con _id, extraer el ID
-              if (catalog is Map && catalog.containsKey('_id')) {
-                return catalog['_id'].toString();
-              }
-              // Si es un String, usarlo directamente
-              return catalog.toString();
-            })
-            .toList()
-            .cast<String>();
-      }
+      // Catalogs are now managed in a separate page (stylist_catalogs_page.dart)
+      
+      _animController = AnimationController(duration: Duration(milliseconds: 500), vsync: this);
+      _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+      );
+      _animController.forward();
       
       print('✅ Todos los controllers inicializados correctamente');
-      print('📋 _selectedCatalogs: $_selectedCatalogs');
     } catch (e) {
       print('❌ Error al inicializar controllers: $e');
       rethrow;
     }
-    
-    _loadCatalogs();
-  }
-
-  Future<void> _loadCatalogs() async {
-    try {
-      final res = await ApiClient.instance.get(
-        '/api/v1/catalog',
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          _catalogs = data is List ? data : (data['data'] ?? []);
-          _loadingCatalogs = false;
-        });
-        print('✅ Catálogos cargados: ${_catalogs.length}');
-      } else {
-        print('❌ Error: ${res.statusCode}');
-        setState(() => _loadingCatalogs = false);
-      }
-    } catch (e) {
-      print('⚠️ Error loading catalogs: $e');
-      setState(() => _loadingCatalogs = false);
-    }
-  }
-
-  void _showCatalogForm() {
-    showDialog(
-      context: context,
-      builder: (ctx) => CatalogFormDialog(
-        token: widget.token,
-        onCatalogCreated: (catalogId) {
-          print('✅ Catálogo creado: $catalogId');
-          _loadCatalogs();
-        },
-      ),
-    );
-  }
-
-  void _showWorkDayDialog(String dayName) {
-    TextEditingController timeCtrl = TextEditingController(
-      text: _workSchedule[dayName]?.join(', ') ?? '',
-    );
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.charcoal,
-        title: Text(
-          'Horario de ${dayName[0].toUpperCase()}${dayName.substring(1)}',
-          style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Ingresa los horarios separados por coma',
-              style: TextStyle(color: AppColors.gray, fontSize: 12),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Ej: 08:00-12:00, 14:00-18:00',
-              style: TextStyle(color: AppColors.gold.withOpacity(0.7), fontSize: 12, fontStyle: FontStyle.italic),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: timeCtrl,
-              style: TextStyle(color: AppColors.gold),
-              decoration: InputDecoration(
-                hintText: '08:00-12:00, 14:00-18:00',
-                hintStyle: TextStyle(color: AppColors.gray.withOpacity(0.5)),
-                filled: true,
-                fillColor: Colors.grey.shade800,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.gold.withOpacity(0.3)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.gold.withOpacity(0.3)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.gold),
-                ),
-              ),
-              maxLines: 2,
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Deja vacío para no trabajar este día',
-              style: TextStyle(color: AppColors.gray, fontSize: 11),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.gray)),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                if (timeCtrl.text.isEmpty) {
-                  _workSchedule[dayName] = [];
-                } else {
-                  _workSchedule[dayName] = timeCtrl.text
-                      .split(',')
-                      .map((s) => s.trim())
-                      .where((s) => s.isNotEmpty)
-                      .toList();
-                }
-              });
-              print('📅 Horario actualizado para $dayName: ${_workSchedule[dayName]}');
-              Navigator.pop(ctx);
-            },
-            child: Text('Guardar', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -234,18 +102,30 @@ class _StylistFormPageState extends State<StylistFormPage> {
     telefonoCtrl.dispose();
     emailCtrl.dispose();
     passwordCtrl.dispose();
+    confirmPasswordCtrl.dispose();
     edadCtrl.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (nombreCtrl.text.isEmpty || emailCtrl.text.isEmpty || _selectedCatalogs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Completa los campos requeridos y selecciona al menos un catálogo'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (nombreCtrl.text.isEmpty) {
+      _showErrorSnack('El nombre es requerido');
+      return;
+    }
+
+    if (!widget.isEdit && emailCtrl.text.isEmpty) {
+      _showErrorSnack('El email es requerido');
+      return;
+    }
+
+    // Validar contraseñas
+    if (!widget.isEdit && passwordCtrl.text.isEmpty) {
+      _showErrorSnack('La contraseña es requerida');
+      return;
+    }
+    if (passwordCtrl.text.isNotEmpty && passwordCtrl.text != confirmPasswordCtrl.text) {
+      _showErrorSnack('Las contraseñas no coinciden');
       return;
     }
 
@@ -259,25 +139,25 @@ class _StylistFormPageState extends State<StylistFormPage> {
     print('📋 edadCtrl: "${edadCtrl.text}" (${edadCtrl.text.runtimeType})');
     print('📋 selectedGender: "$selectedGender" (${selectedGender.runtimeType})');
     print('📋 passwordCtrl: "${passwordCtrl.text.isNotEmpty ? '***' : 'EMPTY'}" (${passwordCtrl.text.runtimeType})');
-    print('📋 _selectedCatalogs: $_selectedCatalogs (${_selectedCatalogs.runtimeType})');
+    print('📋 Note: Catalogs are managed separately in StylistCatalogsPage');
 
-    final data = {
+    final data = <String, dynamic>{
       'nombre': nombreCtrl.text,
       'apellido': apellidoCtrl.text,
       'cedula': cedulaCtrl.text,
       'telefono': telefonoCtrl.text,
       'edad': int.tryParse(edadCtrl.text) ?? 0,
       'genero': selectedGender,
-      'email': emailCtrl.text,
       // Solo incluir password si no está vacío o si estamos creando
       if (!widget.isEdit || passwordCtrl.text.isNotEmpty)
         'password': passwordCtrl.text,
-      // Incluir catalogs (tanto en creación como en edición)
-      'catalogs': _selectedCatalogs,
-      // En creación, incluir role
-      if (!widget.isEdit)
-        'role': AdminConstants.ROLE_ESTILISTA,
     };
+
+    // Email y role solo en creación
+    if (!widget.isEdit) {
+      data['email'] = emailCtrl.text;
+      data['role'] = AdminConstants.ROLE_ESTILISTA;
+    }
 
     // En creación, puede incluir workSchedule si lo desea
     if (!widget.isEdit) {
@@ -298,223 +178,292 @@ class _StylistFormPageState extends State<StylistFormPage> {
 
     try {
       await widget.onSave(data);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        AppDialogHelper.showSuccess(
+          context,
+          title: 'Estilista ${widget.isEdit ? 'actualizada' : 'creada'}',
+          message: '${widget.isEdit ? 'Cambios guardados' : 'Estilista registrada'} exitosamente',
+          onAccept: () {
+            if (mounted) Navigator.pop(context);
+          },
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  void _showErrorSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.all(16),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final maxWidth = isMobile ? screenWidth : 600.0;
+
     return Scaffold(
       backgroundColor: AppColors.charcoal,
       appBar: AppBar(
         backgroundColor: AppColors.charcoal,
+        elevation: 0,
+        centerTitle: false,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.gold),
+          icon: Icon(Icons.arrow_back_ios_new, color: AppColors.gold, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.isEdit ? 'Editar Estilista' : 'Crear Estilista',
-          style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
+          widget.isEdit ? 'Editar Estilista' : 'Nuevo Estilista',
+          style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 18),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Información personal
-            Text('Información Personal', style: TextStyle(color: AppColors.gold, fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            _buildTextField(nombreCtrl, 'Nombre *', Icons.person),
-            SizedBox(height: 16),
-            _buildTextField(apellidoCtrl, 'Apellido *', Icons.person_outline),
-            SizedBox(height: 16),
-            _buildTextField(cedulaCtrl, 'Cédula *', Icons.credit_card),
-            SizedBox(height: 16),
-            _buildTextField(telefonoCtrl, 'Teléfono *', Icons.phone),
-            SizedBox(height: 16),
-            _buildTextField(edadCtrl, 'Edad', Icons.cake, keyboardType: TextInputType.number),
-            SizedBox(height: 16),
-            Text('Género', style: TextStyle(color: AppColors.gold, fontSize: 14, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            GenderSelector(
-              initialValue: selectedGender,
-              onChanged: (value) => setState(() => selectedGender = value),
-            ),
-
-            // Datos de acceso
-            SizedBox(height: 24),
-            Text('Datos de Acceso', style: TextStyle(color: AppColors.gold, fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            _buildTextField(emailCtrl, 'Email *', Icons.email),
-            SizedBox(height: 16),
-            _buildTextField(passwordCtrl, 'Contraseña ${widget.isEdit ? '(dejar vacío para no cambiar)' : '*'}', Icons.lock, isPassword: true),
-
-            // Catálogos - SIEMPRE (creación y edición)
-            SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                  Text('Catálogos *', style: TextStyle(color: AppColors.gold, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gold,
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: Container(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // INFORMACIÓN PERSONAL
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.gold.withOpacity(0.3), width: 1),
                     ),
-                    icon: Icon(Icons.add, color: Colors.black, size: 18),
-                    label: Text('Crear', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
-                    onPressed: _showCatalogForm,
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              _loadingCatalogs
-                  ? Center(child: CircularProgressIndicator(color: AppColors.gold))
-                  : _catalogs.isEmpty
-                      ? Text('No hay catálogos disponibles. ¡Crea uno!', style: TextStyle(color: AppColors.gray))
-                      : Column(
-                          children: _catalogs.map<Widget>((catalog) {
-                            return CheckboxListTile(
-                            title: Text(catalog['nombre'] ?? 'Sin nombre', style: TextStyle(color: AppColors.gold)),
-                            subtitle: Text(catalog['descripcion'] ?? '', style: TextStyle(color: AppColors.gray, fontSize: 12)),
-                            value: _selectedCatalogs.contains(catalog['_id']),
-                            onChanged: (bool? value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedCatalogs.add(catalog['_id']);
-                                } else {
-                                  _selectedCatalogs.remove(catalog['_id']);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                        ),
-
-            // Horario de trabajo - SOLO AL CREAR
-            if (!widget.isEdit) ...[
-              SizedBox(height: 24),
-              Text('Horario de Trabajo (Opcional)', style: TextStyle(color: AppColors.gold, fontSize: 16, fontWeight: FontWeight.bold)),
-              SizedBox(height: 12),
-              ..._workSchedule.entries.map((entry) {
-                final hasHours = entry.value.isNotEmpty;
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: hasHours ? AppColors.gold.withOpacity(0.15) : Colors.grey.shade700,
-                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: hasHours ? AppColors.gold : Colors.transparent,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  onPressed: () => _showWorkDayDialog(entry.key),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            entry.key[0].toUpperCase() + entry.key.substring(1),
-                            style: TextStyle(
-                              color: AppColors.gold,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (hasHours) ...[
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.person, color: AppColors.gold, size: 20),
                             SizedBox(width: 8),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.gold.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '✓ Definido',
-                                style: TextStyle(color: AppColors.gold, fontSize: 11),
+                            Text(
+                              'Información Personal',
+                              style: TextStyle(
+                                color: AppColors.gold,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
+                        ),
+                        SizedBox(height: 16),
+                        _buildTextField(nombreCtrl, 'Nombre', Icons.person),
+                        SizedBox(height: 12),
+                        _buildTextField(apellidoCtrl, 'Apellido', Icons.person_outline),
+                        SizedBox(height: 12),
+                        _buildTextField(cedulaCtrl, 'Cédula', Icons.credit_card),
+                        SizedBox(height: 12),
+                        _buildTextField(edadCtrl, 'Edad', Icons.calendar_today),
+                        SizedBox(height: 12),
+                        _buildTextField(telefonoCtrl, 'Teléfono', Icons.phone),
+                        SizedBox(height: 12),
+                        Text(
+                          'Género',
+                          style: TextStyle(color: AppColors.gold.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                        SizedBox(height: 8),
+                        GenderSelector(
+                          initialValue: selectedGender,
+                          onChanged: (value) => setState(() => selectedGender = value),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // CREDENCIALES
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.gold.withOpacity(0.3), width: 1),
+                    ),
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.lock, color: AppColors.gold, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              widget.isEdit ? 'Cambiar Contraseña' : 'Credenciales',
+                              style: TextStyle(
+                                color: AppColors.gold,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (widget.isEdit) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'Dejar en blanco para no cambiar',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          ),
                         ],
+                        SizedBox(height: 16),
+                        if (!widget.isEdit) ...[
+                          _buildTextField(emailCtrl, 'Email', Icons.email),
+                          SizedBox(height: 12),
+                        ],
+                        _buildTextField(passwordCtrl, widget.isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña', Icons.lock, isPassword: true),
+                        SizedBox(height: 12),
+                        _buildTextField(confirmPasswordCtrl, 'Confirmar contraseña', Icons.lock_outline, isPassword: true),
+                      ],
+                    ),
+                  ),
+
+                  if (widget.isEdit) ...[
+                    SizedBox(height: 16),
+
+                    // GESTIONAR CATÁLOGOS
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.gold.withOpacity(0.3), width: 1),
                       ),
-                      Text(
-                        hasHours ? entry.value.join(', ') : 'Tap para agregar',
-                        style: TextStyle(
-                          color: hasHours ? AppColors.gray : AppColors.gray.withOpacity(0.6),
-                          fontSize: 12,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StylistCatalogsPage(
+                                  token: widget.token,
+                                  stylistId: widget.stylist!['id'],
+                                  stylistName: '${nombreCtrl.text} ${apellidoCtrl.text}',
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Row(
+                              children: [
+                                Icon(Icons.style, color: AppColors.gold, size: 22),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Gestionar Catálogos',
+                                        style: TextStyle(
+                                          color: AppColors.gold,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Servicios y disponibilidad',
+                                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.arrow_forward_ios, color: AppColors.gold, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  SizedBox(height: 24),
+
+                  // BOTONES DE ACCIÓN
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.gold,
+                            side: BorderSide(color: AppColors.gold, width: 1.5),
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Text('Cancelar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _save,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.gold,
+                            foregroundColor: Colors.black87,
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: _isSaving ? 0 : 4,
+                          ),
+                          child: _isSaving
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black87),
+                                )
+                              : Text(
+                                  widget.isEdit ? 'Guardar' : 'Crear',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              );
-            }).toList(),
-            ],
-
-            // Botones
-            SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gray,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Cancelar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gold,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _isSaving ? null : _save,
-                    child: _isSaving
-                        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                        : Text(widget.isEdit ? 'Guardar' : 'Crear', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ],
+                  SizedBox(height: 16),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool isPassword = false,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isPassword = false}) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
-      keyboardType: keyboardType,
-      style: TextStyle(color: AppColors.gold),
+      style: TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppColors.gray),
-        prefixIcon: Icon(icon, color: AppColors.gold),
+        labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+        prefixIcon: Icon(icon, color: AppColors.gold.withOpacity(0.7), size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.gold, width: 1.5),
+        ),
         filled: true,
-        fillColor: Colors.grey.shade800,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        contentPadding: EdgeInsets.symmetric(vertical: 16),
+        fillColor: Colors.grey[850],
+        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       ),
     );
   }

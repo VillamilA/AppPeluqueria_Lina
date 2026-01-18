@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../api/api_client.dart';
 import '../../api/catalogs_api.dart';
+import '../../widgets/search_bar_widget.dart';
+import 'dart:convert';
 import '../../core/theme/app_theme.dart';
+import 'pages/catalog_form_page.dart';
 
 class CatalogManagementPage extends StatefulWidget {
   final String token;
@@ -14,82 +17,167 @@ class CatalogManagementPage extends StatefulWidget {
 }
 
 class _CatalogManagementPageState extends State<CatalogManagementPage> {
-  List<dynamic> _catalogs = [];
-  bool _loading = true;
+  List<dynamic> catalogs = [];
+  List<dynamic> filteredCatalogs = [];
+  bool loading = true;
+  String filterStatus = 'all'; // 'all', 'active', 'inactive'
+  String searchQuery = '';
+  late TextEditingController searchController;
   late CatalogsApi _catalogsApi;
 
   @override
   void initState() {
     super.initState();
+    searchController = TextEditingController();
     _catalogsApi = CatalogsApi(ApiClient.instance);
-    _loadCatalogs();
+    _fetchCatalogs();
   }
 
-  Future<void> _loadCatalogs() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchCatalogs() async {
+    setState(() { loading = true; });
     try {
       final res = await _catalogsApi.getCatalogs(token: widget.token);
+      
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         setState(() {
-          _catalogs = data is List ? data : (data['data'] ?? []);
-          _loading = false;
+          catalogs = data is List ? data : (data['data'] ?? []);
+          _applyFilter();
+          loading = false;
         });
       } else {
-        setState(() => _loading = false);
+        setState(() { catalogs = []; loading = false; });
       }
     } catch (e) {
       print('Error loading catalogs: $e');
-      setState(() => _loading = false);
+      setState(() { catalogs = []; loading = false; });
     }
   }
 
-  void _showCatalogForm({Map<String, dynamic>? catalog}) {
-    showDialog(
-      context: context,
-      builder: (ctx) => _CatalogFormDialog(
+  void _applyFilter() {
+    List<dynamic> temp = catalogs;
+    
+    // Filtrar por estado
+    if (filterStatus == 'all') {
+      temp = catalogs;
+    } else if (filterStatus == 'active') {
+      temp = catalogs.where((c) => (c['activo'] ?? true) == true).toList();
+    } else if (filterStatus == 'inactive') {
+      temp = catalogs.where((c) => (c['activo'] ?? true) == false).toList();
+    }
+    
+    // Filtrar por búsqueda
+    if (searchQuery.isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+      temp = temp.where((c) {
+        final nombre = (c['nombre'] ?? '').toString().toLowerCase();
+        final descripcion = (c['descripcion'] ?? '').toString().toLowerCase();
+        
+        return nombre.contains(query) || 
+               descripcion.contains(query);
+      }).toList();
+    }
+    
+    setState(() {
+      filteredCatalogs = temp;
+    });
+  }
+
+  Future<void> _createCatalog(Map<String, dynamic> catalog) async {
+    setState(() { loading = true; });
+    try {
+      final res = await _catalogsApi.createCatalog(
+        nombre: catalog['nombre'],
+        descripcion: catalog['descripcion'],
+        imageUrl: catalog['imageUrl'],
         token: widget.token,
-        catalog: catalog,
-        onSave: (catalogData) async {
-          if (catalog != null) {
-            // Update
-            final res = await _catalogsApi.updateCatalog(
-              catalogId: catalog['_id'],
-              nombre: catalogData['nombre'],
-              descripcion: catalogData['descripcion'],
-              imageUrl: catalogData['imageUrl'],
-              token: widget.token,
-            );
-            if (res.statusCode == 200) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Catálogo actualizado exitosamente'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              _loadCatalogs();
-            }
-          } else {
-            // Create
-            final res = await _catalogsApi.createCatalog(
-              nombre: catalogData['nombre'],
-              descripcion: catalogData['descripcion'],
-              imageUrl: catalogData['imageUrl'],
-              token: widget.token,
-            );
-            if (res.statusCode == 201 || res.statusCode == 200) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Catálogo creado exitosamente'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              _loadCatalogs();
-            }
-          }
-        },
-      ),
-    );
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Catálogo creado exitosamente'), backgroundColor: Colors.green));
+        await _fetchCatalogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear catálogo'), backgroundColor: Colors.red));
+        setState(() { loading = false; });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      setState(() { loading = false; });
+    }
+  }
+
+  Future<void> _editCatalog(String id, Map<String, dynamic> catalog) async {
+    setState(() { loading = true; });
+    try {
+      final res = await _catalogsApi.updateCatalog(
+        catalogId: id,
+        nombre: catalog['nombre'],
+        descripcion: catalog['descripcion'],
+        imageUrl: catalog['imageUrl'],
+        token: widget.token,
+      );
+      if (res.statusCode == 200) {
+        final index = catalogs.indexWhere((c) => c['_id'] == id);
+        if (index != -1) {
+          setState(() {
+            catalogs[index] = {...catalogs[index], ...catalog};
+            _applyFilter();
+            loading = false;
+          });
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Catálogo actualizado exitosamente'), backgroundColor: Colors.green)
+        );
+        _fetchCatalogs().then((_) => print('Datos sincronizados'));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar catálogo'), backgroundColor: Colors.red));
+        setState(() { loading = false; });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      setState(() { loading = false; });
+    }
+  }
+
+  Future<void> _toggleCatalogStatus(String id, bool currentStatus) async {
+    try {
+      late http.Response res;
+      if (currentStatus) {
+        res = await _catalogsApi.deactivateCatalog(catalogId: id, token: widget.token);
+      } else {
+        res = await _catalogsApi.activateCatalog(catalogId: id, token: widget.token);
+      }
+      
+      if (res.statusCode == 200) {
+        final index = catalogs.indexWhere((c) => c['_id'] == id);
+        if (index != -1) {
+          setState(() {
+            catalogs[index]['activo'] = !currentStatus;
+            _applyFilter();
+          });
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(!currentStatus ? '✅ Catálogo activado' : '❌ Catálogo desactivado'),
+            backgroundColor: !currentStatus ? Colors.green : Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception('Error: ${res.statusCode}');
+      }
+    } catch (e) {
+      print('Error toggling catalog status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _deleteCatalog(String catalogId) async {
@@ -120,26 +208,45 @@ class _CatalogManagementPageState extends State<CatalogManagementPage> {
         );
         if (res.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Catálogo eliminado'),
-              backgroundColor: Colors.green,
-            ),
+            SnackBar(content: Text('Catálogo eliminado'), backgroundColor: Colors.green)
           );
-          _loadCatalogs();
+          _fetchCatalogs();
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
+  void _showCatalogForm({Map<String, dynamic>? catalog, required bool isEdit}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CatalogFormPage(
+          token: widget.token,
+          catalog: catalog,
+          isEdit: isEdit,
+          onSave: (data) async {
+            if (isEdit && catalog != null) {
+              await _editCatalog(catalog['_id'], data);
+            } else {
+              await _createCatalog(data);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int activeCount = catalogs.where((c) => c['activo'] == true).length;
+    final int inactiveCount = catalogs.where((c) => c['activo'] == false).length;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    
     return Scaffold(
       backgroundColor: AppColors.charcoal,
       appBar: AppBar(
@@ -147,217 +254,306 @@ class _CatalogManagementPageState extends State<CatalogManagementPage> {
         backgroundColor: AppColors.charcoal,
         elevation: 0,
       ),
-      body: _loading
-          ? Center(child: CircularProgressIndicator(color: AppColors.gold))
-          : _catalogs.isEmpty
-              ? Center(child: Text('No hay catálogos registrados', style: TextStyle(color: AppColors.gray, fontSize: 16)))
-              : ListView.builder(
-                  padding: EdgeInsets.all(16),
-                  itemCount: _catalogs.length,
-                  itemBuilder: (context, index) {
-                    final catalog = _catalogs[index];
-                    return Card(
-                      color: Colors.black26,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
+      body: Column(
+        children: [
+          // Barra de búsqueda
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: SearchBarWidget(
+              controller: searchController,
+              placeholder: 'Buscar por nombre o descripción...',
+              onSearch: (value) {
+                setState(() {
+                  searchQuery = value;
+                  _applyFilter();
+                });
+              },
+              onClear: () {
+                setState(() {
+                  searchQuery = '';
+                  _applyFilter();
+                });
+              },
+            ),
+          ),
+          // Filtros
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900,
+              border: Border(bottom: BorderSide(color: AppColors.gold.withOpacity(0.2))),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildFilterChip('Todos', 'all', catalogs.length),
+                _buildFilterChip('Activos', 'active', activeCount),
+                _buildFilterChip('Inactivos', 'inactive', inactiveCount),
+              ],
+            ),
+          ),
+          // Lista
+          Expanded(
+            child: loading
+                ? Center(child: CircularProgressIndicator(color: AppColors.gold))
+                : filteredCatalogs.isEmpty
+                    ? Center(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            Icon(Icons.folder_open, size: 64, color: AppColors.gray),
+                            SizedBox(height: 16),
                             Text(
-                              catalog['nombre'] ?? 'Sin nombre',
-                              style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              catalog['descripcion'] ?? 'Sin descripción',
-                              style: TextStyle(color: AppColors.gray, fontSize: 14),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-                                  icon: Icon(Icons.edit, color: Colors.black),
-                                  label: Text('Editar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                                  onPressed: () => _showCatalogForm(catalog: catalog),
-                                ),
-                                SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                  icon: Icon(Icons.delete, color: Colors.white),
-                                  label: Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  onPressed: () => _deleteCatalog(catalog['_id']),
-                                ),
-                              ],
+                              'No hay catálogos en esta categoría',
+                              style: TextStyle(color: AppColors.gray, fontSize: 16),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
-      floatingActionButton: FloatingActionButton(
+                      )
+                    : isTablet
+                        ? GridView.builder(
+                            padding: EdgeInsets.all(16),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 1.6,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: filteredCatalogs.length,
+                            itemBuilder: (context, i) => _buildCatalogCard(filteredCatalogs[i]),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.all(16),
+                            itemCount: filteredCatalogs.length,
+                            itemBuilder: (context, i) => _buildCatalogCard(filteredCatalogs[i]),
+                          ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.gold,
-        child: Icon(Icons.add, color: Colors.black),
-        onPressed: () => _showCatalogForm(),
+        icon: Icon(Icons.add, color: Colors.black),
+        label: Text('Nuevo', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        onPressed: () => _showCatalogForm(isEdit: false),
       ),
     );
   }
-}
 
-class _CatalogFormDialog extends StatefulWidget {
-  final String token;
-  final Map<String, dynamic>? catalog;
-  final Function(Map<String, dynamic>) onSave;
-
-  const _CatalogFormDialog({
-    required this.token,
-    this.catalog,
-    required this.onSave,
-  });
-
-  @override
-  State<_CatalogFormDialog> createState() => _CatalogFormDialogState();
-}
-
-class _CatalogFormDialogState extends State<_CatalogFormDialog> {
-  late TextEditingController nombreCtrl;
-  late TextEditingController descripcionCtrl;
-  late TextEditingController imageUrlCtrl;
-  final bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    nombreCtrl = TextEditingController(text: widget.catalog?['nombre'] ?? '');
-    descripcionCtrl = TextEditingController(text: widget.catalog?['descripcion'] ?? '');
-    imageUrlCtrl = TextEditingController(text: widget.catalog?['imageUrl'] ?? '');
-  }
-
-  @override
-  void dispose() {
-    nombreCtrl.dispose();
-    descripcionCtrl.dispose();
-    imageUrlCtrl.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (nombreCtrl.text.isEmpty || descripcionCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Completa todos los campos'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    widget.onSave({
-      'nombre': nombreCtrl.text,
-      'descripcion': descripcionCtrl.text,
-      'imageUrl': imageUrlCtrl.text,
-    });
-
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.charcoal,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildCatalogCard(Map<String, dynamic> c) {
+    final isActive = c['activo'] ?? true;
+    final servicesCount = (c['services'] as List?)?.length ?? 0;
+    
+    return Card(
+      color: Colors.grey.shade900,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.gold.withOpacity(0.2)),
+      ),
+      elevation: 4,
+      margin: EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.catalog != null ? 'Editar Catálogo' : 'Crear Nuevo Catálogo',
-                style: TextStyle(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.category, color: AppColors.gold, size: 20),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c['nombre'] ?? 'Sin nombre',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isActive ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isActive ? Colors.green : Colors.red,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isActive ? Icons.check_circle : Icons.block,
+                                  size: 12,
+                                  color: isActive ? Colors.green : Colors.red,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  isActive ? 'Activo' : 'Inactivo',
+                                  style: TextStyle(
+                                    color: isActive ? Colors.green : Colors.red,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            Divider(color: AppColors.gold.withOpacity(0.2), height: 24),
+            
+            // Info
+            _buildInfoRow(Icons.description, c['descripcion'] ?? 'Sin descripción'),
+            SizedBox(height: 8),
+            _buildInfoRow(Icons.content_cut, '$servicesCount servicio${servicesCount != 1 ? 's' : ''}'),
+            
+            SizedBox(height: 16),
+            
+            // Actions
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildActionButton(
+                  icon: Icons.edit,
+                  label: 'Editar',
                   color: AppColors.gold,
-                  fontSize: 18,
+                  onPressed: () => _showCatalogForm(catalog: c, isEdit: true),
+                ),
+                _buildActionButton(
+                  icon: isActive ? Icons.block : Icons.check_circle,
+                  label: isActive ? 'Desactivar' : 'Activar',
+                  color: isActive ? Colors.red : Colors.green,
+                  onPressed: () => _toggleCatalogStatus(c['_id'], isActive),
+                ),
+                _buildActionButton(
+                  icon: Icons.delete,
+                  label: 'Eliminar',
+                  color: Colors.red,
+                  onPressed: () => _deleteCatalog(c['_id']),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.gray),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: AppColors.gray, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: Size(0, 36),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      icon: Icon(icon, size: 16),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+      onPressed: onPressed,
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value, int count) {
+    final isSelected = filterStatus == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          filterStatus = value;
+          _applyFilter();
+        });
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.gold : Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.black : AppColors.gray,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+            SizedBox(width: 6),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.black : AppColors.gold.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: isSelected ? AppColors.gold : AppColors.gold,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 20),
-              _buildTextField(nombreCtrl, 'Nombre *', Icons.category),
-              SizedBox(height: 12),
-              _buildTextField(
-                descripcionCtrl,
-                'Descripción *',
-                Icons.description,
-                maxLines: 3,
-              ),
-              SizedBox(height: 12),
-              _buildTextField(imageUrlCtrl, 'URL de Imagen', Icons.image),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gray,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gold,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    onPressed: _isSaving ? null : _save,
-                    child: Text(
-                      widget.catalog != null ? 'Guardar' : 'Crear',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      style: TextStyle(color: AppColors.gold),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.gray),
-        prefixIcon: Icon(icon, color: AppColors.gold),
-        filled: true,
-        fillColor: Colors.grey.shade800,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       ),
     );
   }

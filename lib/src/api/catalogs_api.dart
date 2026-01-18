@@ -98,4 +98,24 @@ class CatalogsApi {
         '/api/v1/catalog/$catalogId',
         headers: {'Authorization': 'Bearer $token'},
       );
+
+  /// Activar un catálogo (PATCH /api/v1/catalog/:id/activate)
+  Future<http.Response> activateCatalog({
+    required String catalogId,
+    required String token,
+  }) async =>
+      await _client.patch(
+        '/api/v1/catalog/$catalogId/activate',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+  /// Desactivar un catálogo (PATCH /api/v1/catalog/:id/deactivate)
+  Future<http.Response> deactivateCatalog({
+    required String catalogId,
+    required String token,
+  }) async =>
+      await _client.patch(
+        '/api/v1/catalog/$catalogId/deactivate',
+        headers: {'Authorization': 'Bearer $token'},
+      );
 }

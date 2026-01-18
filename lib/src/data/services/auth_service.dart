@@ -31,4 +31,69 @@ class AuthService {
       throw Exception('Error en el registro: ${response.body}');
     }
   }
+
+  /// Solicita código de recuperación de contraseña
+  static Future<void> forgotPassword(String email) async {
+    final url = '${dotenv.env['API_BASE_URL']}/api/v1/auth/forgot-password';
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email}),
+    );
+
+    if (response.statusCode == 200) {
+      // Código enviado exitosamente
+      return;
+    } else if (response.statusCode == 404) {
+      throw Exception('Usuario no encontrado');
+    } else if (response.statusCode == 429) {
+      throw Exception('Debes esperar 90 segundos para reenviar el código');
+    } else {
+      final body = json.decode(response.body);
+      throw Exception(body['message'] ?? 'Error al solicitar código');
+    }
+  }
+
+  /// Restablece la contraseña con el código de recuperación
+  static Future<void> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    final url = '${dotenv.env['API_BASE_URL']}/api/v1/auth/reset-password';
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'email': email,
+        'code': code,
+        'newPassword': newPassword,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      // Contraseña actualizada exitosamente
+      return;
+    } else if (response.statusCode == 404) {
+      throw Exception('Usuario no encontrado');
+    } else if (response.statusCode == 400) {
+      final body = json.decode(response.body);
+      final message = body['message'] ?? 'Error al restablecer contraseña';
+      
+      if (message.contains('expirado')) {
+        throw Exception('Código expirado. Solicita uno nuevo.');
+      } else if (message.contains('incorrecto')) {
+        throw Exception('Código incorrecto');
+      } else if (message.contains('contraseña')) {
+        throw Exception('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número');
+      }
+      
+      throw Exception(message);
+    } else {
+      final body = json.decode(response.body);
+      throw Exception(body['message'] ?? 'Error al restablecer contraseña');
+    }
+  }
 }

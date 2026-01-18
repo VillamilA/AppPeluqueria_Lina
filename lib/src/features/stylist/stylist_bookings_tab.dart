@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../api/stylist_bookings_api.dart';
 import '../../api/api_client.dart';
 import 'dart:convert';
+import '../../widgets/cancel_booking_dialog.dart';
+import 'widgets/stylist_booking_card.dart';
 
 class StylistBookingsTab extends StatefulWidget {
   final String token;
@@ -135,62 +136,20 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
   }
 
   Future<void> _cancelBooking(String bookingId) async {
-    // Mostrar diálogo para pedir motivo
-    String? motivo;
-    await showDialog(
+    // Encontrar la info de la reserva para mostrar en el diálogo
+    final booking = _bookings.firstWhere((b) => b['_id'] == bookingId, orElse: () => {});
+    final clientName = booking['clientName'] ?? 'Cliente';
+    
+    final motivo = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey.shade900,
-        title: Text('Cancelar Cita', style: TextStyle(color: AppColors.gold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '¿Por qué deseas cancelar esta cita?',
-                style: TextStyle(color: Colors.white70),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                maxLines: 3,
-                onChanged: (value) => motivo = value,
-                decoration: InputDecoration(
-                  hintText: 'Motivo de la cancelación...',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.gold.withOpacity(0.3)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.gold.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.gold),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade800,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                style: TextStyle(color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.gray)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Confirmar Cancelación', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+      builder: (context) => CancelBookingDialog(
+        bookingInfo: clientName,
       ),
-    ).then((confirmed) async {
-      if (confirmed == true) {
-        try {
-          final response = await _api.cancelBooking(bookingId, widget.token, motivo: motivo);
+    );
+    
+    if (motivo != null && motivo.isNotEmpty) {
+      try {
+        final response = await _api.cancelBooking(bookingId, widget.token, motivo: motivo);
           if (response.statusCode == 200) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Reserva cancelada'), backgroundColor: Colors.green),
@@ -202,12 +161,11 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
             );
           }
         } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
-    });
+    }
   }
 
   Color _getStatusColor(String status) {
@@ -300,11 +258,11 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
                             separatorBuilder: (_, __) => SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final booking = _filteredBookings[index];
-                              print('📋 [BOOKING] Index: $index, Booking: $booking');
                               
-                              // Obtener datos del cliente (solo ID en la respuesta)
+                              // Obtener datos del cliente
                               final clienteNombre = booking['clienteNombre'] ?? 'Cliente';
                               final clienteApellido = booking['clienteApellido'] ?? '';
+                              final fullClientName = '$clienteNombre $clienteApellido'.trim();
                               
                               // Obtener nombre del servicio
                               final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
@@ -317,7 +275,7 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
                                   fecha = DateTime.parse(inicioStr);
                                 }
                               } catch (e) {
-                                print('Error al parsear fecha: $e');
+                                // Fecha inválida
                               }
                               
                               // Obtener horas
@@ -333,162 +291,31 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
                                   endTime = '${fin.hour.toString().padLeft(2, '0')}:${fin.minute.toString().padLeft(2, '0')}';
                                 }
                               } catch (e) {
-                                print('Error al parsear horas: $e');
+                                // Horas inválidas
                               }
 
                               final estado = booking['estado'] ?? booking['status'] ?? 'SCHEDULED';
+                              final notas = booking['notas'];
 
-                              return Card(
-                                color: AppColors.charcoal,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: _getStatusColor(estado).withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '$clienteNombre $clienteApellido',
-                                                  style: TextStyle(
-                                                    color: AppColors.gold,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  servicioNombre,
-                                                  style: TextStyle(
-                                                    color: AppColors.gray,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: _getStatusColor(estado).withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: _getStatusColor(estado),
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              _getStatusLabel(estado),
-                                              style: TextStyle(
-                                                color: _getStatusColor(estado),
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.calendar_today, color: AppColors.gray, size: 16),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            fecha != null 
-                                              ? DateFormat('d MMMM, yyyy', 'es_ES').format(fecha)
-                                              : 'Sin fecha',
-                                            style: TextStyle(color: AppColors.gray, fontSize: 12),
-                                          ),
-                                          SizedBox(width: 16),
-                                          Icon(Icons.access_time, color: AppColors.gray, size: 16),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            '$startTime - $endTime',
-                                            style: TextStyle(color: AppColors.gray, fontSize: 12),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 12),
-                                      if (booking['notas'] != null && booking['notas'].toString().isNotEmpty) ...[
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.shade800,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            booking['notas'],
-                                            style: TextStyle(
-                                              color: AppColors.gray,
-                                              fontSize: 11,
-                                              fontStyle: FontStyle.italic,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(height: 12),
-                                      ],
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          if (estado == 'SCHEDULED')
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.green,
-                                                  foregroundColor: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                ),
-                                                onPressed: () => _confirmBooking(booking['_id']),
-                                                child: Text('Confirmar'),
-                                              ),
-                                            ),
-                                          if (estado == 'CONFIRMED')
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.gold,
-                                                  foregroundColor: Colors.black,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                ),
-                                                onPressed: () => _completeBooking(booking['_id']),
-                                                child: Text('Completar'),
-                                              ),
-                                            ),
-                                          if (estado != 'COMPLETED' && estado != 'CANCELLED')
-                                            SizedBox(width: 8),
-                                          if (estado != 'COMPLETED' && estado != 'CANCELLED')
-                                            Expanded(
-                                              child: OutlinedButton(
-                                                style: OutlinedButton.styleFrom(
-                                                  foregroundColor: Colors.red,
-                                                  side: BorderSide(color: Colors.red),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                ),
-                                                onPressed: () => _cancelBooking(booking['_id']),
-                                                child: Text('Cancelar'),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              return StylistBookingCard(
+                                clientName: fullClientName,
+                                serviceName: servicioNombre,
+                                date: fecha,
+                                startTime: startTime,
+                                endTime: endTime,
+                                status: estado.toUpperCase(),
+                                statusColor: _getStatusColor(estado),
+                                statusLabel: _getStatusLabel(estado),
+                                notes: notas,
+                                onConfirm: (estado == 'SCHEDULED' || estado == 'PENDING')
+                                    ? () => _confirmBooking(booking['_id'])
+                                    : null,
+                                onComplete: (estado == 'CONFIRMED')
+                                    ? () => _completeBooking(booking['_id'])
+                                    : null,
+                                onCancel: (estado != 'COMPLETED' && estado != 'CANCELLED')
+                                    ? () => _cancelBooking(booking['_id'])
+                                    : null,
                               );
                             },
                           ),

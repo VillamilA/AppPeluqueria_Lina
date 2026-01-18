@@ -4,6 +4,7 @@ import '../../api/api_client.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
+import '../../services/notification_service.dart';
 
 class ReserveBookingDialog extends StatefulWidget {
   final String clienteId;
@@ -35,6 +36,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
   String? selectedSlotId;
   List<dynamic> availableSlots = [];
   String? selectedCategoryId;
+  bool _slotsLoaded = false;
   
   // Control
   bool _loading = false;
@@ -55,24 +57,48 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
 
   Future<void> fetchSlots() async {
     if (stylistId == null || widget.serviceId.isEmpty || selectedDate == null) return;
-    final days = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO'];
-    final dayOfWeek = days[selectedDate!.weekday % 7];
-    print('[RESERVE_DIALOG] Fetching slots for stylist=$stylistId, service=${widget.serviceId}, day=$dayOfWeek');
+    
+    print('📍 Fetching slots: service=${widget.serviceId}, date=$selectedDate');
+    
+    final dateString = "${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
+    
     final res = await BookingsApi(ApiClient.instance).getSlots(
-      stylistId: stylistId!,
       serviceId: widget.serviceId,
-      dayOfWeek: dayOfWeek,
-      token: widget.token,
+      date: dateString,
     );
+    
+    print('📌 Response status: ${res.statusCode}');
+    print('📋 Response body: ${res.body}');
+    
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+      // La respuesta es un array directo: [{ slotId, stylistId, stylistName, start, end }, ...]
+      List<dynamic> slots = jsonDecode(res.body) as List;
+      
+      print('✅ Slots encontrados: ${slots.length}');
+      for (var slot in slots) {
+        print('   - ${slot['start']} a ${slot['end']}, estilista: ${slot['stylistName']}');
+      }
+      
       setState(() {
-        availableSlots = data['data'] ?? [];
+        availableSlots = slots;
         selectedSlotId = null;
+        _slotsLoaded = true;
       });
-    } else {
+    } else if (res.statusCode == 404) {
+      print('⚠️ Sin slots disponibles (404)');
       setState(() {
         availableSlots = [];
+        selectedSlotId = null;
+        _slotsLoaded = true;
+      });
+    } else {
+      print('❌ Error: ${res.statusCode}');
+      setState(() {
+        _slotsLoaded = true;
+      });
+      setState(() {
+        availableSlots = [];
+        selectedSlotId = null;
       });
     }
   }
@@ -342,7 +368,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                             ),
                           ),
                           SizedBox(height: 12),
-                          if (availableSlots.isEmpty)
+                          if (availableSlots.isEmpty && !_slotsLoaded)
                             Container(
                               padding: EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -353,6 +379,20 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                               child: Text(
                                 'Cargando horarios disponibles...',
                                 style: TextStyle(color: Colors.orangeAccent),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          else if (availableSlots.isEmpty && _slotsLoaded)
+                            Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                'No hay horarios disponibles para esta fecha',
+                                style: TextStyle(color: Colors.red),
                                 textAlign: TextAlign.center,
                               ),
                             )
@@ -369,20 +409,23 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                               itemCount: availableSlots.length,
                               itemBuilder: (context, i) {
                                 final slot = availableSlots[i];
-                                final isOccupied = slot['isActive'] == false;
-                                final isSelected = selectedSlotId == slot['id'];
+                                final isAvailable = slot['isAvailable'] ?? true;
+                                final slotId = slot['_id'] ?? '';
+                                final isSelected = selectedSlotId == slotId;
+                                final startTime = slot['startTime'] ?? '??:??';
+                                final endTime = slot['endTime'] ?? '??:??';
 
                                 return GestureDetector(
-                                  onTap: isOccupied
+                                  onTap: !isAvailable
                                       ? null
                                       : () {
                                           setState(() {
-                                            selectedSlotId = slot['id'];
+                                            selectedSlotId = slotId;
                                           });
                                         },
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: isOccupied
+                                      color: !isAvailable
                                           ? Colors.grey.shade700
                                           : isSelected
                                               ? AppColors.gold
@@ -391,7 +434,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                                       border: Border.all(
                                         color: isSelected
                                             ? AppColors.gold
-                                            : isOccupied
+                                            : !isAvailable
                                                 ? Colors.red.withOpacity(0.3)
                                                 : Colors.transparent,
                                         width: 2,
@@ -400,7 +443,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        if (isOccupied) ...[
+                                        if (!isAvailable) ...[
                                           Icon(Icons.lock, color: Colors.red, size: 24),
                                           SizedBox(height: 4),
                                           Text(
@@ -420,7 +463,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                                           ),
                                           SizedBox(height: 4),
                                           Text(
-                                            '${slot['startTime']}',
+                                            startTime,
                                             style: TextStyle(
                                               color: isSelected ? Colors.black : AppColors.gold,
                                               fontWeight: FontWeight.bold,
@@ -435,7 +478,7 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                                             ),
                                           ),
                                           Text(
-                                            '${slot['endTime']}',
+                                            endTime,
                                             style: TextStyle(
                                               color: isSelected ? Colors.black : AppColors.gray,
                                               fontSize: 10,
@@ -562,48 +605,49 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
     setState(() => _loading = true);
 
     try {
-      print('[RESERVE] selectedSlotId: $selectedSlotId');
-      print('[RESERVE] availableSlots count: ${availableSlots.length}');
+      print('📌 [RESERVE] selectedSlotId: $selectedSlotId');
+      print('📌 [RESERVE] availableSlots count: ${availableSlots.length}');
       
+      // Buscar el slot por su _id
       final slot = availableSlots.firstWhere(
         (s) {
-          print('[RESERVE] Comparing slot id: ${s['id']} with selectedSlotId: $selectedSlotId');
-          return s['id'] == selectedSlotId;
+          final slotId = s['_id'] ?? '';
+          print('📌 [RESERVE] Comparing slot _id: $slotId with selectedSlotId: $selectedSlotId');
+          return slotId == selectedSlotId;
         },
         orElse: () {
-          print('[RESERVE] No slot found with id: $selectedSlotId');
+          print('❌ [RESERVE] No slot found with id: $selectedSlotId');
           throw Exception('Slot no encontrado');
         },
       );
 
-      print('[RESERVE] Slot encontrado: $slot');
+      print('✅ [RESERVE] Slot encontrado: ${slot['_id']} - ${slot['startTime']}-${slot['endTime']}');
       
-      // Formato correcto del endpoint
       final bookingData = {
-        "slotId": slot['_id'] ?? slot['id'], // ID del slot
-        "date": DateFormat('yyyy-MM-dd').format(selectedDate!), // Formato YYYY-MM-DD
+        "slotId": slot['_id'],
+        "date": DateFormat('yyyy-MM-dd').format(selectedDate!),
         "notas": _notasCtrl.text.isNotEmpty ? _notasCtrl.text : null,
       };
 
-      print('[RESERVE] Enviando reserva: $bookingData');
-      print('[RESERVE] Token: ${widget.token.substring(0, 20)}...');
+      print('📤 [RESERVE] Enviando reserva: $bookingData');
 
       final result = await BookingsApi(ApiClient.instance).createBooking(bookingData, token: widget.token);
 
-      print('[RESERVE] Response status: ${result.statusCode}');
-      print('[RESERVE] Response body: ${result.body}');
+      print('📥 [RESERVE] Response status: ${result.statusCode}');
+      print('📋 [RESERVE] Response body: ${result.body}');
 
       setState(() => _loading = false);
 
       if (result.statusCode == 201 || result.statusCode == 200) {
         if (mounted) {
+          await _sendBookingNotifications();
           _showSuccessDialog();
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al crear la reserva: ${result.statusCode} - ${result.body}'),
+              content: Text('Error al crear la reserva: ${result.statusCode}'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -611,8 +655,8 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
         }
       }
     } catch (e, stackTrace) {
-      print('[RESERVE] ERROR: $e');
-      print('[RESERVE] Stack trace: $stackTrace');
+      print('❌ [RESERVE] ERROR: $e');
+      print('❌ [RESERVE] Stack trace: $stackTrace');
       setState(() => _loading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -623,6 +667,53 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
           ),
         );
       }
+    }
+  }
+
+  /// Enviar notificaciones al cliente y al estilista
+  Future<void> _sendBookingNotifications() async {
+    try {
+      final notificationService = NotificationService();
+      
+      // Solicitar permisos si no están otorgados
+      final hasPermission = await notificationService.requestPermissions();
+      if (!hasPermission) {
+        print('[NOTIFICATIONS] Permisos de notificación denegados');
+        return;
+      }
+
+      // Obtener información del slot y estilista seleccionados
+      final slot = availableSlots.firstWhere(
+        (s) => (s['_id'] ?? s['id']) == selectedSlotId,
+        orElse: () => {},
+      );
+      
+      final stylist = widget.stylists.firstWhere(
+        (s) => s['_id'] == stylistId,
+        orElse: () => {},
+      );
+
+      final stylistName = stylist['nombre'] ?? 'Estilista';
+      final formattedDate = DateFormat('dd/MM/yyyy').format(selectedDate!);
+      final startTime = slot['horaInicio'] ?? 'N/A';
+
+      // Notificación para el cliente (usuario actual)
+      await notificationService.notifyClientBookingCreated(
+        stylistName: stylistName,
+        date: formattedDate,
+        time: startTime,
+        notificationId: DateTime.now().millisecondsSinceEpoch % 1000000,
+      );
+
+      print('[NOTIFICATIONS] Notificación enviada al cliente');
+
+      // Nota: En una implementación real, el backend debería enviar 
+      // una notificación push al estilista. Por ahora, solo simulamos 
+      // que se enviará cuando el estilista abra la app.
+      
+    } catch (e) {
+      print('[NOTIFICATIONS] Error al enviar notificaciones: $e');
+      // No interrumpimos el flujo aunque falle la notificación
     }
   }
 

@@ -4,7 +4,9 @@ import '../../api/slots_api.dart';
 import '../../api/api_client.dart';
 import '../stylist/stylist_home_tab.dart';
 import '../stylist/stylist_bookings_tab.dart';
+import '../stylist/stylist_catalogs_tab.dart';
 import '../stylist/stylist_profile_tab.dart';
+import '../stylist/schedule_management_page.dart';
 
 class StylistDashboardPage extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -38,25 +40,84 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    
     final tabs = [
       _buildHomeTab(),
       _buildBookingsTab(),
+      _buildScheduleTab(),
+      _buildCatalogsTab(),
       _buildProfileTab(),
     ];
+    
     return Scaffold(
       backgroundColor: AppColors.charcoal,
       body: SafeArea(child: tabs[_currentIndex]),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: AppColors.gold,
-        unselectedItemColor: AppColors.gray,
-        backgroundColor: AppColors.charcoal,
-        onTap: (i) => setState(() => _currentIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Citas'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.gold,
+              AppColors.gold.withOpacity(0.85),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withOpacity(0.3),
+              blurRadius: 20,
+              offset: Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            currentIndex: _currentIndex,
+            selectedItemColor: Colors.black,
+            unselectedItemColor: Colors.black.withOpacity(0.5),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: isTablet ? 12 : 10,
+            ),
+            unselectedLabelStyle: TextStyle(
+              fontSize: isTablet ? 11 : 9,
+            ),
+            selectedIconTheme: IconThemeData(
+              size: isTablet ? 26 : 22,
+            ),
+            unselectedIconTheme: IconThemeData(
+              size: isTablet ? 24 : 20,
+            ),
+            onTap: (i) => setState(() => _currentIndex = i),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard_rounded),
+                label: 'Inicio',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_month_rounded),
+                label: 'Citas',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.schedule_rounded),
+                label: 'Horarios',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.content_cut_rounded),
+                label: 'Servicios',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Perfil',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -74,6 +135,21 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
 
   Widget _buildBookingsTab() {
     return StylistBookingsTab(token: _token);
+  }
+
+  Widget _buildScheduleTab() {
+    return ScheduleManagementPage(
+      token: _token,
+      stylistId: _stylistId,
+      stylistName: _stylistName,
+    );
+  }
+
+  Widget _buildCatalogsTab() {
+    return StylistCatalogsTab(
+      stylistId: _stylistId,
+      token: _token,
+    );
   }
 
   Widget _buildProfileTab() {

@@ -8,9 +8,15 @@ class RegisterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear Cuenta'),
-        backgroundColor: AppColors.charcoal, // Fondo negro
-        foregroundColor: AppColors.gold,   ),// Letras doradas
+      appBar: AppBar(
+        title: const Text('Crear Cuenta'),
+        backgroundColor: AppColors.charcoal,
+        foregroundColor: AppColors.gold,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.gold),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: const SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16),

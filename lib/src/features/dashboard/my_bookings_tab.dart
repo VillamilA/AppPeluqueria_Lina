@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../../api/api_client.dart';
 import '../../api/bookings_api.dart';
+import '../../widgets/cancel_booking_dialog.dart';
 import '../../core/theme/app_theme.dart';
 import '../booking/rating_dialog.dart';
 import '../common/dialogs/app_dialogs.dart';
@@ -91,13 +97,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       case 'SCHEDULED':
         return 'Programada';
       case 'CONFIRMED':
-        return 'Confirmada';
+        return 'Reservada';
       case 'COMPLETED':
         return 'Completada';
       case 'CANCELLED':
         return 'Cancelada';
       case 'PENDING':
         return 'Pendiente';
+      case 'PENDING_STYLIST_CONFIRMATION':
+        return 'Pendiente aprobación';
       default:
         return status ?? 'Desconocido';
     }
@@ -113,6 +121,38 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         return Colors.green;
       case 'CANCELLED':
         return Colors.red;
+      case 'PENDING_STYLIST_CONFIRMATION':
+        return Colors.amber;
+      default:
+        return AppColors.gray;
+    }
+  }
+
+  String _getPaymentStatusLabel(String? paymentStatus) {
+    switch (paymentStatus?.toUpperCase()) {
+      case 'PAID':
+        return 'Pagado';
+      case 'UNPAID':
+        return 'No Pagado';
+      case 'PENDING':
+        return 'Pendiente';
+      case 'REFUNDED':
+        return 'Reembolsado';
+      default:
+        return paymentStatus ?? 'Desconocido';
+    }
+  }
+
+  Color _getPaymentStatusColor(String? paymentStatus) {
+    switch (paymentStatus?.toUpperCase()) {
+      case 'PAID':
+        return Colors.green.shade400;
+      case 'UNPAID':
+        return Colors.red.shade400;
+      case 'PENDING':
+        return Colors.orange.shade400;
+      case 'REFUNDED':
+        return Colors.blue.shade400;
       default:
         return AppColors.gray;
     }
@@ -202,6 +242,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           final estilistaNombre = '${booking['estilistaNombre'] ?? ''} ${booking['estilistaApellido'] ?? ''}';
                           final inicio = booking['inicio'];
                           final fin = booking['fin'];
+                          final paymentStatus = booking['paymentStatus'] ?? 'UNPAID';
+                          final precio = booking['precio'];
+                          final invoiceNumber = booking['invoiceNumber'];
                           
                           return Card(
                             color: Colors.grey.shade800,
@@ -246,8 +289,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                       ),
                                       Container(
                                         padding: EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
+                                          horizontal: 10,
+                                          vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
                                           color: _getStatusColor(status).withOpacity(0.2),
@@ -260,7 +303,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                           _getStatusLabel(status),
                                           style: TextStyle(
                                             color: _getStatusColor(status),
-                                            fontSize: 12,
+                                            fontSize: 10,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -289,6 +332,52 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                           'Horario',
                                           _getTimeRange(inicio, fin),
                                         ),
+                                        if (precio != null) ...[
+                                          SizedBox(height: 8),
+                                          _buildDetailRow(
+                                            'Precio',
+                                            '\$${precio.toStringAsFixed(2)}',
+                                          ),
+                                        ],
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Estado de Pago:',
+                                              style: TextStyle(
+                                                color: AppColors.gray,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: _getPaymentStatusColor(paymentStatus).withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: _getPaymentStatusColor(paymentStatus),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                _getPaymentStatusLabel(paymentStatus),
+                                                style: TextStyle(
+                                                  color: _getPaymentStatusColor(paymentStatus),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (invoiceNumber != null) ...[
+                                          SizedBox(height: 8),
+                                          _buildDetailRow(
+                                            'Factura',
+                                            invoiceNumber,
+                                          ),
+                                        ],
                                         if (booking['notas'] != null && booking['notas'].isNotEmpty) ...[
                                           SizedBox(height: 8),
                                           Text(
@@ -351,29 +440,53 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.grey.shade700,
                                               foregroundColor: Colors.white,
+                                              padding: EdgeInsets.symmetric(vertical: 10),
                                               shape: RoundedRectangleBorder(
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
                                             ),
-                                            icon: Icon(Icons.edit_calendar),
-                                            label: Text('Reprogramar'),
+                                            icon: Icon(Icons.edit_calendar, size: 18),
+                                            label: Text('Reprogramar', style: TextStyle(fontSize: 12)),
                                             onPressed: () {
                                               _showRescheduleDialog(booking);
                                             },
                                           ),
                                         ),
-                                        SizedBox(width: 8),
+                                        SizedBox(width: 6),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: paymentStatus == 'PAID' 
+                                                  ? Colors.grey.shade600 
+                                                  : Colors.green.shade700,
+                                              foregroundColor: Colors.white,
+                                              padding: EdgeInsets.symmetric(vertical: 10),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            icon: Icon(Icons.payment, size: 18),
+                                            label: Text('Pagar', style: TextStyle(fontSize: 12)),
+                                            onPressed: paymentStatus == 'PAID' 
+                                                ? null 
+                                                : () {
+                                                    _showPaymentDialog(booking);
+                                                  },
+                                          ),
+                                        ),
+                                        SizedBox(width: 6),
                                         Expanded(
                                           child: ElevatedButton.icon(
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.red.shade700,
                                               foregroundColor: Colors.white,
+                                              padding: EdgeInsets.symmetric(vertical: 10),
                                               shape: RoundedRectangleBorder(
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
                                             ),
-                                            icon: Icon(Icons.cancel),
-                                            label: Text('Cancelar'),
+                                            icon: Icon(Icons.cancel, size: 18),
+                                            label: Text('Cancelar', style: TextStyle(fontSize: 12)),
                                             onPressed: () {
                                               _showCancelDialog(booking);
                                             },
@@ -415,14 +528,24 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     );
   }
 
-  Future<void> _cancelBooking(String bookingId) async {
+  Future<void> _cancelBooking(String bookingId, String bookingInfo) async {
+    // Mostrar diálogo para obtener el motivo
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => CancelBookingDialog(
+        bookingInfo: bookingInfo,
+      ),
+    );
+
+    if (motivo == null || motivo.isEmpty) return; // Usuario canceló
+
     try {
       AppDialogHelper.showLoading(context);
 
       final api = BookingsApi(ApiClient.instance);
       final response = await api.cancelBooking(
         bookingId,
-        data: {"motivo": "Cancelado por cliente"},
+        data: {"motivo": motivo},
         token: widget.token,
       );
 
@@ -480,34 +603,13 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   void _showCancelDialog(dynamic booking) {
     final bookingId = booking['_id'] ?? '';
     final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
-    final inicio = booking['inicio'];
+    final estilistaName = booking['estilistaName'] ?? 'Estilista';
     
-    // Calcular horas restantes
-    int horasRestantes = 0;
-    try {
-      if (inicio != null) {
-        final fechaCita = DateTime.parse(inicio.toString());
-        final ahora = DateTime.now();
-        horasRestantes = fechaCita.difference(ahora).inHours;
-      }
-    } catch (e) {
-      print('Error calculando horas restantes: $e');
-    }
+    // Crear info para el diálogo
+    final bookingInfo = '$servicioNombre con $estilistaName';
 
-    final bool puedesCancelar = horasRestantes >= 12;
-    
-    AppDialogHelper.showConfirm(
-      context,
-      title: '¿Cancelar esta cita?',
-      message: servicioNombre,
-      subtitle: puedesCancelar 
-        ? null 
-        : 'Tu cuenta será congelada por 24 horas si cancelas ahora.',
-      confirmText: 'Confirmar cancelación',
-      cancelText: 'Volver',
-      isDestructive: true,
-      onConfirm: () => _cancelBooking(bookingId),
-    );
+    // Llamar directamente a _cancelBooking que mostrará el diálogo de motivo
+    _cancelBooking(bookingId, bookingInfo);
   }
 
   void _showRescheduleDialog(dynamic booking) {
@@ -535,6 +637,316 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       message: message,
       buttonText: 'Cerrar',
     );
+  }
+
+  Future<void> _showPaymentDialog(dynamic booking) async {
+    final bookingId = booking['_id'];
+    if (bookingId == null) {
+      AppDialogHelper.showError(
+        context,
+        title: 'Error',
+        message: 'No se pudo obtener el ID de la reserva',
+      );
+      return;
+    }
+
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Solicitar información de transferencia
+      final response = await http.post(
+        Uri.parse('${ApiClient.instance.baseUrl}/api/v1/payments/booking/$bookingId/transfer-request'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final bankInfo = data['bankInfo'];
+        final amount = data['amount'];
+
+        if (bankInfo != null && mounted) {
+          _showBankInfoDialog(bookingId, bankInfo, amount);
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        if (mounted) {
+          AppDialogHelper.showError(
+            context,
+            title: 'Error',
+            message: errorData['message'] ?? 'No se pudo generar la solicitud de pago',
+          );
+        }
+      }
+    } catch (e) {
+      // Cerrar loading si está abierto
+      if (mounted) Navigator.pop(context);
+      
+      if (mounted) {
+        AppDialogHelper.showError(
+          context,
+          title: 'Error de conexión',
+          message: 'No se pudo conectar con el servidor: $e',
+        );
+      }
+    }
+  }
+
+  void _showBankInfoDialog(String bookingId, Map<String, dynamic> bankInfo, dynamic amount) {
+    final bank = bankInfo['bank'] ?? '';
+    final accountType = bankInfo['accountType'] ?? '';
+    final accountNumber = bankInfo['accountNumber'] ?? '';
+    final accountHolder = bankInfo['accountHolder'] ?? '';
+    final reference = bankInfo['reference'] ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Información de Transferencia'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Monto a pagar: \$${amount?.toStringAsFixed(2) ?? '0.00'}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+              _buildInfoRow('Banco:', bank),
+              _buildInfoRow('Tipo de cuenta:', accountType),
+              _buildCopyableRow('Número de cuenta:', accountNumber),
+              _buildInfoRow('Titular:', accountHolder),
+              _buildCopyableRow('Referencia:', reference),
+              const SizedBox(height: 24),
+              const Text(
+                'Por favor, realiza la transferencia y luego sube el comprobante.',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _pickAndUploadProof(bookingId);
+            },
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Subir Comprobante'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCopyableRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: value));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$label copiado'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadProof(String bookingId) async {
+    final ImagePicker picker = ImagePicker();
+    
+    // Mostrar opciones de cámara o galería
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar Comprobante'),
+        content: const Text('¿Cómo deseas obtener el comprobante?'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Cámara'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('Galería'),
+          ),
+        ],
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Validar tamaño (max 2MB)
+      final file = File(image.path);
+      final fileSize = await file.length();
+      if (fileSize > 2 * 1024 * 1024) {
+        if (mounted) {
+          AppDialogHelper.showError(
+            context,
+            title: 'Archivo muy grande',
+            message: 'El comprobante no debe exceder 2 MB',
+          );
+        }
+        return;
+      }
+
+      // Mostrar loading
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Crear request multipart
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiClient.instance.baseUrl}/api/v1/payments/booking/$bookingId/transfer-proof'),
+      );
+
+      request.headers['Authorization'] = 'Bearer ${widget.token}';
+      
+      // Determinar el tipo MIME basado en la extensión del archivo
+      String? mimeType;
+      final extension = image.path.toLowerCase().split('.').last;
+      
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'webp':
+          mimeType = 'image/webp';
+          break;
+        default:
+          mimeType = 'image/jpeg'; // Por defecto
+      }
+      
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          image.path,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          AppDialogHelper.showSuccess(
+            context,
+            title: 'Comprobante subido',
+            message: 'Tu comprobante ha sido enviado correctamente. El pago será verificado pronto.',
+            onAccept: () {
+              _fetchMyBookings(); // Recargar las reservas
+            },
+          );
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        if (mounted) {
+          AppDialogHelper.showError(
+            context,
+            title: 'Error al subir comprobante',
+            message: errorData['message'] ?? 'No se pudo subir el comprobante',
+          );
+        }
+      }
+    } catch (e) {
+      // Cerrar loading si está abierto
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst || !route.willHandlePopInternally);
+      }
+      
+      if (mounted) {
+        AppDialogHelper.showError(
+          context,
+          title: 'Error',
+          message: 'No se pudo subir el comprobante: $e',
+        );
+      }
+    }
   }
 }
 

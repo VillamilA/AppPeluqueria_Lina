@@ -6,11 +6,14 @@ import '../../dashboard/stylist_dashboard_page.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/token_storage.dart';
+import '../../../services/session_manager.dart';
 import '../../../core/utils/validators.dart';
 import '../pages/register_page.dart';
+import '../pages/forgot_password_page.dart';
 import '../dialogs/unverified_email_dialog.dart';
 import '../../common/dialogs/app_dialogs.dart';
 import 'package:peluqueria_lina_app/src/widgets/custom_input_field.dart';
+import 'auth_message_dialog.dart';
 
 // LoginForm es el formulario donde el usuario ingresa sus datos para iniciar sesión
 class LoginForm extends StatefulWidget {
@@ -38,50 +41,58 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Icono decorativo
-          Container(
-            width: 80,
-            height: 80,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [AppColors.gold, Colors.transparent],
-                radius: 0.8,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
             ),
-            child: const Icon(
-              Icons.lock_outline,
-              color: AppColors.gold,
-              size: 40,
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Formulario centrado y con ancho máximo
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Form(
-              key: _formKey, // Asocia la llave para validación
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Mensaje de bienvenida
-                  const Text(
-                    'Bienvenido, inicia sesión para continuar',
-                    style: TextStyle(color: AppColors.gray, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16), // Espacio vertical
-                  // Campo de correo electrónico
-                  CustomInputField(
-                    controller: _emailCtrl,
+            child: IntrinsicHeight(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Icono decorativo
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [AppColors.gold, Colors.transparent],
+                          radius: 0.8,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline,
+                        color: AppColors.gold,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Formulario centrado y con ancho máximo
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Form(
+                        key: _formKey, // Asocia la llave para validación
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Mensaje de bienvenida
+                            const Text(
+                              'Bienvenido, inicia sesión para continuar',
+                              style: TextStyle(color: AppColors.gray, fontSize: 13),
+                            ),
+                            const SizedBox(height: 14), // Espacio vertical
+                            // Campo de correo electrónico
+                            CustomInputField(
+                              controller: _emailCtrl,
                     label: 'Correo',
                     keyboardType: TextInputType.emailAddress,
                     validator: Validators.email, // Usa función de validación
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   // Campo de contraseña con opción de mostrar/ocultar
                   CustomInputField(
                     controller: _passCtrl,
@@ -101,7 +112,41 @@ class _LoginFormState extends State<LoginForm> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
+                  // Enlace "¿Olvidaste tu contraseña?" - Dorado y visible
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.lock_reset,
+                        size: 18,
+                        color: AppColors.gold,
+                      ),
+                      TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPasswordPage(),
+                                  ),
+                                );
+                              },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.gold,
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.gold,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        ),
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   // Botón para iniciar sesión
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -119,7 +164,39 @@ class _LoginFormState extends State<LoginForm> {
                             if (!(_formKey.currentState?.validate() ?? false)) {
                               return;
                             }
-                            setState(() => _loading = true); // Mostrar carga
+                            
+                            // Mostrar diálogo de carga
+                            if (!mounted) return;
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => PopScope(
+                                canPop: false,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.charcoal,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CircularProgressIndicator(color: AppColors.gold),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Iniciando sesión...',
+                                          style: TextStyle(color: Colors.white, fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                            
+                            setState(() => _loading = true);
+                            
                             try {
                               // Llamar al servicio de login
                               final res = await AuthService.instance.login(
@@ -139,15 +216,20 @@ class _LoginFormState extends State<LoginForm> {
                               if (isEmailVerified == false) {
                                 setState(() => _loading = false);
                                 if (!mounted) return;
-                                // Mostrar advertencia y popup de verificación
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('⚠️ Debes verificar tu correo electrónico antes de continuar'),
-                                    backgroundColor: Colors.orange,
-                                    duration: Duration(seconds: 3),
-                                  ),
+                                Navigator.of(context).pop(); // Cerrar loading
+                                
+                                // Esperar un momento para que se cierre el loading
+                                await Future.delayed(const Duration(milliseconds: 300));
+                                if (!mounted) return;
+                                
+                                // Mostrar diálogo de advertencia
+                                await AuthMessageDialog.show(
+                                  context,
+                                  title: 'Email No Verificado',
+                                  message: 'Debes verificar tu correo electrónico antes de continuar. Revisa tu bandeja de entrada.',
+                                  type: MessageType.warning,
                                 );
-                                await Future.delayed(const Duration(milliseconds: 500));
+                                
                                 if (!mounted) return;
                                 showDialog(
                                   context: context,
@@ -165,21 +247,28 @@ class _LoginFormState extends State<LoginForm> {
                                 accessToken: res['accessToken'],
                                 refreshToken: res['refreshToken'] ?? '',
                               );
+                              
+                              // Iniciar el monitoreo de sesión (20 minutos de inactividad)
+                              SessionManager().startSession();
+                              
                               if (!mounted) return;
                               
-                              // Mostrar éxito con diálogo centralizado
-                              AppDialogHelper.showSuccess(
+                              // Cerrar diálogo de carga
+                              Navigator.of(context).pop();
+                              
+                              // Mostrar éxito brevemente y redirigir automáticamente
+                              await AuthMessageDialog.showAuto(
                                 context,
-                                title: '¡Acceso exitoso!',
-                                message: 'Bienvenido a Peluquería Lina',
-                                onAccept: () {
-                                  // Redirigir según el rol
-                                  _redirectToDashboard(res);
-                                },
+                                title: '¡Bienvenido!',
+                                message: 'Has iniciado sesión correctamente',
+                                type: MessageType.success,
+                                seconds: 2,
+                                onClose: () => _redirectToDashboard(res),
                               );
                             } catch (e) {
                               setState(() => _loading = false);
                               if (!mounted) return;
+                              Navigator.of(context).pop(); // Cerrar loading
                               
                               // Convertir error a string
                               String errorMsg = e.toString();
@@ -216,19 +305,16 @@ class _LoginFormState extends State<LoginForm> {
                                                           errorMsg.toLowerCase().contains('incorrectos') ||
                                                           errorMsg.toLowerCase().contains('invalid');
                               
-                              if (isInvalidCredentials) {
-                                AppDialogHelper.showError(
-                                  context,
-                                  title: 'Credenciales Inválidas',
-                                  message: 'Usuario o contraseña incorrectos. Por favor intenta nuevamente.',
-                                );
-                              } else {
-                                AppDialogHelper.showError(
-                                  context,
-                                  title: 'Error de Conexión',
-                                  message: errorMsg.isEmpty ? 'Error al iniciar sesión' : errorMsg,
-                                );
-                              }
+                              // Mostrar error con diálogo elegante
+                              await AuthMessageDialog.show(
+                                context,
+                                title: isInvalidCredentials ? 'Credenciales Incorrectas' : 'Error de Inicio de Sesión',
+                                message: isInvalidCredentials 
+                                    ? 'El correo o la contraseña que ingresaste no son correctos. Por favor verifica tus datos e intenta nuevamente.'
+                                    : errorMsg,
+                                type: MessageType.error,
+                                confirmText: 'Reintentar',
+                              );
                             } finally {
                               if (mounted) setState(() => _loading = false);
                             }
@@ -283,8 +369,13 @@ class _LoginFormState extends State<LoginForm> {
               ),
             ),
           ),
-        ],
-      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

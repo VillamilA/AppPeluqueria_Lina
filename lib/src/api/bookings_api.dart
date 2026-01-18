@@ -2,17 +2,21 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class BookingsApi {
-    Future<http.Response> getSlots({
-        required String stylistId,
-        required String serviceId,
-        required String dayOfWeek,
-        String? token,
-    }) async {
-        final path = '/api/v1/slots?stylistId=$stylistId&serviceId=$serviceId&dayOfWeek=$dayOfWeek';
-        return await _client.get(path, headers: token != null ? {'Authorization': 'Bearer $token'} : null);
-    }
   final ApiClient _client;
   BookingsApi(this._client);
+
+  /// Obtener slots disponibles para un servicio en una fecha
+  /// GET /api/v1/bookings/availability?date=YYYY-MM-DD&serviceId=ID
+  /// Retorna un array directo de slots: [{ slotId, stylistId, stylistName, start, end }, ...]
+  /// NO REQUIERE autenticación (público)
+  Future<http.Response> getSlots({
+    required String serviceId,
+    required String date,
+  }) async {
+    String path = '/api/v1/bookings/availability?date=$date&serviceId=$serviceId';
+    print('📍 BookingsApi.getSlots: $path');
+    return await _client.get(path);
+  }
 
   Future<http.Response> createBooking(Map<String, dynamic> data, {required String token}) async =>
       await _client.post('/api/v1/bookings', body: data, headers: {'Authorization': 'Bearer $token'});

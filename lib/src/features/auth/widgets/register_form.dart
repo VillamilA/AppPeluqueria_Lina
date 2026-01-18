@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/validators.dart';
 import '../dialogs/verify_email_dialog.dart';
+import 'auth_message_dialog.dart';
 
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
@@ -214,8 +215,18 @@ class _RegisterFormState extends State<RegisterForm> {
                           });
                         } catch (e) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(e.toString())),
+                          
+                          String errorMsg = e.toString();
+                          if (errorMsg.startsWith('Exception: ')) {
+                            errorMsg = errorMsg.substring(11);
+                          }
+                          
+                          await AuthMessageDialog.show(
+                            context,
+                            title: 'Error en el Registro',
+                            message: errorMsg,
+                            type: MessageType.error,
+                            confirmText: 'Intentar Nuevamente',
                           );
                         } finally {
                           if (mounted) setState(() => _loading = false);

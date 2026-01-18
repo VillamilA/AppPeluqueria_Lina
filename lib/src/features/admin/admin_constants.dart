@@ -112,15 +112,25 @@ class FormBuilder {
     required String genero,
     required String email,
     required String password,
+    bool isEdit = false,
   }) {
-    return {
+    final data = <String, dynamic>{
       'nombre': nombre,
       'apellido': apellido,
       'cedula': cedula,
       'telefono': telefono,
       'genero': genero,
-      'email': email,
-      'password': password,
     };
+
+    if (password.isNotEmpty) {
+      data['password'] = password;
+    }
+
+    // Email solo en creación (no permitido en edición)
+    if (!isEdit) {
+      data['email'] = email;
+    }
+
+    return data;
   }
 }
