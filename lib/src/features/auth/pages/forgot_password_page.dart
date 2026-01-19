@@ -3,7 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/services/auth_service.dart';
 import '../widgets/auth_message_dialog.dart';
-import 'verify_code_page.dart';
+import 'reset_password_page.dart';
 
 /// Página para solicitar código de recuperación de contraseña
 class ForgotPasswordPage extends StatefulWidget {
@@ -107,10 +107,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       // Iniciar countdown
       _startCountdown();
 
-      // Navegar a página de verificación de código
+      // ✅ NAVEGAR DIRECTAMENTE AL FORMULARIO DE CAMBIO CON EL CÓDIGO
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => VerifyCodePage(email: email),
+          builder: (_) => ResetPasswordPage(email: email),
         ),
       );
     } catch (e) {
@@ -126,6 +126,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       } else if (e.toString().contains('90 segundos')) {
         message = 'Debes esperar 90 segundos antes de solicitar otro código';
         _startCountdown();
+        
+        // Mostrar alerta que se cierra automáticamente en 3 segundos
+        // pero el botón estará deshabilitado por 90 segundos
+        AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.warning,
+          title: 'Espera un momento',
+          message: message + '\nEl botón se habilitará en $_countdown segundos',
+          seconds: 3,
+        );
+        return;
       } else if (e.toString().contains('connection')) {
         message = 'Error de conexión. Verifica tu internet.';
       }

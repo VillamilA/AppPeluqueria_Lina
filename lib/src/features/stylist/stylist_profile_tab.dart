@@ -95,7 +95,7 @@ class StylistProfileTab extends StatelessWidget {
   }
 
   Widget _buildProfileCard() {
-    final Color roleColor = Color(0xFFFFD93D); // Amarillo dorado para estilista
+    final Color roleColor = AppColors.gold; // Color dorado del negocio
 
     return Container(
       decoration: BoxDecoration(
@@ -343,15 +343,15 @@ class StylistProfileTab extends StatelessWidget {
           icon: Icons.schedule,
           title: 'Gestionar Horarios',
           subtitle: 'Configura tu disponibilidad y servicios',
-          color: Colors.blue,
+          color: AppColors.gold.withOpacity(0.8),
           onTap: () => _showCreateSlotDialog(context),
         ),
         SizedBox(height: 12),
         _buildOptionCard(
           icon: Icons.edit_square,
           title: 'Editar Perfil',
-          subtitle: 'Actualiza tu información personal',
-          color: Colors.purple,
+          subtitle: 'Actualiza tu información',
+          color: Colors.grey.shade600,
           onTap: () => ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
           ),
@@ -361,18 +361,8 @@ class StylistProfileTab extends StatelessWidget {
           icon: Icons.lock_outline,
           title: 'Cambiar Contraseña',
           subtitle: 'Actualiza tu contraseña de acceso',
-          color: Colors.orange,
+          color: AppColors.gold,
           onTap: () => _navigateToChangePassword(context),
-        ),
-        SizedBox(height: 12),
-        _buildOptionCard(
-          icon: Icons.notifications_outlined,
-          title: 'Notificaciones',
-          subtitle: 'Configura tus preferencias',
-          color: Colors.teal,
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
-          ),
         ),
       ],
     );
@@ -389,7 +379,7 @@ class StylistProfileTab extends StatelessWidget {
             icon: Icons.schedule,
             title: 'Horarios',
             subtitle: 'Disponibilidad',
-            color: Colors.blue,
+            color: AppColors.gold.withOpacity(0.8),
             onTap: () => _showCreateSlotDialog(context),
             isGridItem: true,
           ),
@@ -400,7 +390,7 @@ class StylistProfileTab extends StatelessWidget {
             icon: Icons.edit_square,
             title: 'Editar Perfil',
             subtitle: 'Tus datos',
-            color: Colors.purple,
+            color: Colors.grey.shade600,
             onTap: () => ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
             ),
@@ -413,21 +403,8 @@ class StylistProfileTab extends StatelessWidget {
             icon: Icons.lock_outline,
             title: 'Contraseña',
             subtitle: 'Seguridad',
-            color: Colors.orange,
+            color: AppColors.gold,
             onTap: () => _navigateToChangePassword(context),
-            isGridItem: true,
-          ),
-        ),
-        SizedBox(
-          width: 200,
-          child: _buildOptionCard(
-            icon: Icons.notifications_outlined,
-            title: 'Notificaciones',
-            subtitle: 'Alertas',
-            color: Colors.teal,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
-            ),
             isGridItem: true,
           ),
         ),

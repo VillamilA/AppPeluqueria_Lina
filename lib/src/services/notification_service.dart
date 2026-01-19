@@ -49,13 +49,29 @@ class NotificationService {
   }) async {
     await initialize();
     
+    // Verificar permisos antes de enviar
+    bool hasPermission = await Permission.notification.isGranted;
+    if (!hasPermission) {
+      print('⚠️ [NOTIFICATION] Permiso denegado, solicitando nuevamente...');
+      final status = await Permission.notification.request();
+      hasPermission = status.isGranted;
+      
+      if (!hasPermission) {
+        print('❌ [NOTIFICATION] Usuario rechazó permisos, no se envía notificación');
+        return;
+      }
+    }
+    
+    print('✅ [NOTIFICATION] Permisos verificados, enviando notificación...');
+    
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'booking_client_channel',
       'Reservas de Citas',
       channelDescription: 'Notificaciones sobre tus citas reservadas',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'app_icon', // Usar icono personalizado
+      largeIcon: const DrawableResourceAndroidBitmap('app_icon'),
       color: Color(0xFFE4A853), // Gold color
       enableVibration: true,
       playSound: true,
@@ -70,6 +86,8 @@ class NotificationService {
       details,
       payload: 'booking_client_$notificationId',
     );
+    
+    print('📲 [NOTIFICATION] Notificación enviada correctamente');
   }
 
   /// Notificación para el estilista cuando le reservan una cita
@@ -81,13 +99,29 @@ class NotificationService {
   }) async {
     await initialize();
     
+    // Verificar permisos antes de enviar
+    bool hasPermission = await Permission.notification.isGranted;
+    if (!hasPermission) {
+      print('⚠️ [NOTIFICATION] Permiso denegado, solicitando nuevamente...');
+      final status = await Permission.notification.request();
+      hasPermission = status.isGranted;
+      
+      if (!hasPermission) {
+        print('❌ [NOTIFICATION] Usuario rechazó permisos, no se envía notificación');
+        return;
+      }
+    }
+    
+    print('✅ [NOTIFICATION] Permisos verificados, enviando notificación estilista...');
+    
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'booking_stylist_channel',
       'Nuevas Citas',
       channelDescription: 'Notificaciones sobre citas reservadas contigo',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'app_icon', // Usar icono personalizado
+      largeIcon: const DrawableResourceAndroidBitmap('app_icon'),
       color: Color(0xFFFFD93D), // Yellow color for stylist
       enableVibration: true,
       playSound: true,
@@ -102,6 +136,8 @@ class NotificationService {
       details,
       payload: 'booking_stylist_$notificationId',
     );
+    
+    print('📲 [NOTIFICATION] Notificación estilista enviada correctamente');
   }
 
   /// Notificación cuando una cita es cancelada
@@ -114,13 +150,29 @@ class NotificationService {
   }) async {
     await initialize();
     
+    // Verificar permisos antes de enviar
+    bool hasPermission = await Permission.notification.isGranted;
+    if (!hasPermission) {
+      print('⚠️ [NOTIFICATION] Permiso denegado, solicitando nuevamente...');
+      final status = await Permission.notification.request();
+      hasPermission = status.isGranted;
+      
+      if (!hasPermission) {
+        print('❌ [NOTIFICATION] Usuario rechazó permisos, no se envía notificación');
+        return;
+      }
+    }
+    
+    print('✅ [NOTIFICATION] Permisos verificados, enviando notificación cancelación...');
+    
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'booking_cancelled_channel',
       'Citas Canceladas',
       channelDescription: 'Notificaciones sobre citas canceladas',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'app_icon', // Usar icono personalizado
+      largeIcon: const DrawableResourceAndroidBitmap('app_icon'),
       color: Color(0xFFFF6B6B), // Red color for cancellation
       enableVibration: true,
       playSound: true,
@@ -140,6 +192,64 @@ class NotificationService {
       details,
       payload: 'booking_cancelled_$notificationId',
     );
+  }
+
+  /// Notificación cuando una cita es reprogramada
+  Future<void> notifyBookingRescheduled({
+    required String serviceName,
+    required String stylistName,
+    required String oldDate,
+    required String oldTime,
+    required String newDate,
+    required String newTime,
+    int notificationId = 2500,
+  }) async {
+    await initialize();
+    
+    // Verificar permisos antes de enviar
+    bool hasPermission = await Permission.notification.isGranted;
+    if (!hasPermission) {
+      print('⚠️ [NOTIFICATION] Permiso denegado, solicitando nuevamente...');
+      final status = await Permission.notification.request();
+      hasPermission = status.isGranted;
+      
+      if (!hasPermission) {
+        print('❌ [NOTIFICATION] Usuario rechazó permisos, no se envía notificación');
+        return;
+      }
+    }
+    
+    print('✅ [NOTIFICATION] Permisos verificados, enviando notificación reprogramación...');
+    
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'booking_rescheduled_channel',
+      'Citas Reprogramadas',
+      channelDescription: 'Notificaciones sobre citas reprogramadas',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: 'app_icon',
+      largeIcon: const DrawableResourceAndroidBitmap('app_icon'),
+      color: Color(0xFFFFC93C), // Gold color for rescheduled
+      enableVibration: true,
+      playSound: true,
+    );
+
+    final NotificationDetails details = NotificationDetails(android: androidDetails);
+
+    // Mensaje resumido con los nuevos datos
+    final message = '$serviceName\n'
+        'Ahora: $newDate - $newTime\n'
+        'Con $stylistName';
+
+    await _notifications.show(
+      notificationId,
+      '📅 Cita Reprogramada',
+      message,
+      details,
+      payload: 'booking_rescheduled_$notificationId',
+    );
+    
+    print('📲 [NOTIFICATION] Notificación reprogramación enviada correctamente');
   }
 
   /// Notificación recordatoria de cita (próximamente)

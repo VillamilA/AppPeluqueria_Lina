@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../api/api_client.dart';
 import '../../api/slots_api.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/business_hours_service.dart';
 
 /// Hub de gestión de horarios para estilistas
 /// Accesible por: ESTILISTA (su propio), ADMIN, GERENTE
@@ -247,6 +248,9 @@ class WorkSchedulePage extends StatefulWidget {
 
 class _WorkSchedulePageState extends State<WorkSchedulePage> {
   final SlotsApi _slotsApi = SlotsApi(ApiClient.instance);
+  late BusinessHoursService _businessHoursService;
+  Map<int, BusinessHours>? _businessHours;
+  
   bool _isLoading = true;
   bool _isSaving = false;
   
@@ -267,7 +271,26 @@ class _WorkSchedulePageState extends State<WorkSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentSchedule();
+    _businessHoursService = BusinessHoursService();
+    _businessHoursService.initialize();
+    _initializeData();
+  }
+
+  /// Carga datos en orden: primero horarios del negocio, luego schedule del estilista
+  Future<void> _initializeData() async {
+    try {
+      print('📥 [SCHEDULE_HUB] Iniciando carga de datos...');
+      
+      // 1️⃣ PRIMERO cargar horarios del negocio
+      await _loadBusinessHours();
+      print('✅ [SCHEDULE_HUB] Horarios del negocio cargados');
+      
+      // 2️⃣ LUEGO cargar horario actual del estilista
+      await _loadCurrentSchedule();
+      print('✅ [SCHEDULE_HUB] Horario del estilista cargado');
+    } catch (e) {
+      print('❌ [SCHEDULE_HUB] Error durante inicialización: $e');
+    }
   }
 
   Future<void> _loadCurrentSchedule() async {
@@ -309,6 +332,22 @@ class _WorkSchedulePageState extends State<WorkSchedulePage> {
     }
   }
 
+  /// 📍 Cargar horarios del negocio
+  Future<void> _loadBusinessHours() async {
+    try {
+      print('📥 [SCHEDULE_HUB] Cargando horarios del negocio...');
+      final hours = await _businessHoursService.getBusinessHours();
+      setState(() => _businessHours = hours);
+      print('✅ [SCHEDULE_HUB] Horarios cargados: ${hours.length} días');
+      print('🔍 [SCHEDULE_HUB] Claves del mapa: ${hours.keys.toList()}');
+      for (var entry in hours.entries) {
+        print('   📌 Día ${entry.key}: ${entry.value.openTime} - ${entry.value.closeTime}');
+      }
+    } catch (e) {
+      print('❌ [SCHEDULE_HUB] Error cargando horarios del negocio: $e');
+    }
+  }
+
   TimeOfDay _parseTime(String time) {
     try {
       final parts = time.split(':');
@@ -323,12 +362,58 @@ class _WorkSchedulePageState extends State<WorkSchedulePage> {
   }
 
   Future<void> _saveSchedule(int dayOfWeek) async {
+    print('🟢 [SCHEDULE_HUB] ¡LLAMÓ _saveSchedule para día $dayOfWeek!');
     setState(() => _isSaving = true);
     try {
       final slots = _schedule[dayOfWeek]!.map((slot) => {
         'start': _formatTime(slot['start']!),
         'end': _formatTime(slot['end']!),
       }).toList();
+
+      // ✅ VALIDAR CADA SLOT CONTRA HORARIOS DEL NEGOCIO
+      for (final slot in slots) {
+        print('🔍 [SCHEDULE_HUB] Validando slot: ${slot['start']} - ${slot['end']}');
+        
+        final startParts = (slot['start'] as String).split(':');
+        final endParts = (slot['end'] as String).split(':');
+        
+        final startTime = TimeOfDay(
+          hour: int.parse(startParts[0]),
+          minute: int.parse(startParts[1]),
+        );
+        final endTime = TimeOfDay(
+          hour: int.parse(endParts[0]),
+          minute: int.parse(endParts[1]),
+        );
+
+        final validationError = await _validateTimeRangeWithBusinessHours(
+          dayOfWeek,
+          startTime,
+          endTime,
+        );
+
+        if (validationError != null) {
+          print('❌ [SCHEDULE_HUB] VALIDACIÓN FALLÓ: $validationError');
+          if (mounted) {
+            _showValidationDialog(
+              isSuccess: false,
+              message: validationError,
+            );
+          }
+          setState(() => _isSaving = false);
+          return;
+        }
+      }
+      
+      print('✅ [SCHEDULE_HUB] TODAS LAS VALIDACIONES PASARON, procediendo a guardar...');
+      
+      // Mostrar mensaje de éxito en validación
+      if (mounted) {
+        _showValidationDialog(
+          isSuccess: true,
+          message: 'Validación correcta.\nGuardando horario...',
+        );
+      }
 
       // El backend siempre requiere stylistId en el body
       final body = <String, dynamic>{
@@ -370,6 +455,132 @@ class _WorkSchedulePageState extends State<WorkSchedulePage> {
     } finally {
       setState(() => _isSaving = false);
     }
+  }
+
+  /// ✅ VALIDAR QUE EL HORARIO ESTÉ DENTRO DEL RANGO DEL NEGOCIO
+  Future<String?> _validateTimeRangeWithBusinessHours(
+    int dayOfWeek,
+    TimeOfDay startTime,
+    TimeOfDay endTime,
+  ) async {
+    print('🔍 [VALIDACIÓN] Iniciando validación para día $dayOfWeek');
+    print('🔍 [VALIDACIÓN] _businessHours es null? ${_businessHours == null}');
+    print('🔍 [VALIDACIÓN] _businessHours keys: ${_businessHours?.keys.toList()}');
+    
+    if (_businessHours == null) {
+      print('❌ [VALIDACIÓN] ERROR: Horarios del negocio no cargados');
+      return '❌ Error: Horarios del negocio no cargados. Intenta recargar la página.';
+    }
+
+    final businessHour = _businessHours![dayOfWeek];
+    print('🔍 [VALIDACIÓN] businessHour para día $dayOfWeek: $businessHour');
+    print('🔍 [VALIDACIÓN] businessHour?.openTime: ${businessHour?.openTime}');
+    print('🔍 [VALIDACIÓN] businessHour?.closeTime: ${businessHour?.closeTime}');
+    
+    if (businessHour == null) {
+      print('❌ [VALIDACIÓN] ERROR: El negocio no atiende este día');
+      return '❌ El negocio no atiende este día (Mapa vacío o día no configurado)';
+    }
+
+    // Validar que esté dentro del horario del negocio
+    final startTimeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+    final endTimeStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+    
+    final (isValid, errorMessage) = await _businessHoursService.validateStylistHours(
+      dayOfWeek: dayOfWeek,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+    );
+
+    print('🔍 [VALIDACIÓN] Resultado: isValid=$isValid, error=$errorMessage');
+    return isValid ? null : errorMessage;
+  }
+
+  /// Muestra un diálogo de validación en el centro de la pantalla
+  void _showValidationDialog({
+    required bool isSuccess,
+    required String message,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        // Auto-cerrar después de 3 segundos
+        Future.delayed(Duration(seconds: 3), () {
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        });
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: isSuccess ? Colors.green.shade600 : Colors.red.shade700,
+          child: Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: isSuccess
+                    ? [Colors.green.shade600, Colors.green.shade700]
+                    : [Colors.red.shade700, Colors.red.shade800],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono grande
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSuccess ? Icons.check_circle : Icons.error,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 20),
+                // Título
+                Text(
+                  isSuccess ? '✅ Éxito' : '❌ Error',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 12),
+                // Mensaje
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                ),
+                SizedBox(height: 20),
+                // Barra de progreso
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 4,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override

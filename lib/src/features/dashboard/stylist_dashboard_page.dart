@@ -6,7 +6,6 @@ import '../stylist/stylist_home_tab.dart';
 import '../stylist/stylist_bookings_tab.dart';
 import '../stylist/stylist_catalogs_tab.dart';
 import '../stylist/stylist_profile_tab.dart';
-import '../stylist/schedule_management_page.dart';
 
 class StylistDashboardPage extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -46,7 +45,6 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
     final tabs = [
       _buildHomeTab(),
       _buildBookingsTab(),
-      _buildScheduleTab(),
       _buildCatalogsTab(),
       _buildProfileTab(),
     ];
@@ -104,10 +102,6 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
                 label: 'Citas',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.schedule_rounded),
-                label: 'Horarios',
-              ),
-              BottomNavigationBarItem(
                 icon: Icon(Icons.content_cut_rounded),
                 label: 'Servicios',
               ),
@@ -135,14 +129,6 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
 
   Widget _buildBookingsTab() {
     return StylistBookingsTab(token: _token);
-  }
-
-  Widget _buildScheduleTab() {
-    return ScheduleManagementPage(
-      token: _token,
-      stylistId: _stylistId,
-      stylistName: _stylistName,
-    );
   }
 
   Widget _buildCatalogsTab() {

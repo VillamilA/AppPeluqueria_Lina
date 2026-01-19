@@ -331,15 +331,57 @@ class BookingsStatusPieChart extends StatelessWidget {
   Color _getColorForStatus(String status) {
     switch (status.toUpperCase()) {
       case 'COMPLETED':
-        return Colors.green;
+        return Color(0xFF10B981); // Verde esmeralda
       case 'CANCELLED':
-        return Colors.red;
+        return Color(0xFFEF4444); // Rojo vibrante
       case 'NO_SHOW':
-        return Colors.orange;
+        return Color(0xFFF59E0B); // Ámbar
       case 'PENDING':
-        return Colors.blue;
+        return Color(0xFF3B82F6); // Azul
+      case 'CONFIRMED':
+        return Color(0xFF8B5CF6); // Púrpura
+      case 'IN_PROGRESS':
+        return Color(0xFF06B6D4); // Cyan
       default:
-        return Colors.grey;
+        return Color(0xFF6B7280);
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toUpperCase()) {
+      case 'COMPLETED':
+        return 'Completado';
+      case 'CANCELLED':
+        return 'Cancelado';
+      case 'NO_SHOW':
+        return 'No Presentado';
+      case 'PENDING':
+        return 'Pendiente';
+      case 'CONFIRMED':
+        return 'Confirmado';
+      case 'IN_PROGRESS':
+        return 'En Progreso';
+      default:
+        return status;
+    }
+  }
+
+  IconData _getIconForStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'COMPLETED':
+        return Icons.check_circle;
+      case 'CANCELLED':
+        return Icons.cancel;
+      case 'NO_SHOW':
+        return Icons.no_accounts;
+      case 'PENDING':
+        return Icons.schedule;
+      case 'CONFIRMED':
+        return Icons.verified;
+      case 'IN_PROGRESS':
+        return Icons.hourglass_bottom;
+      default:
+        return Icons.circle;
     }
   }
 
@@ -382,6 +424,21 @@ class BookingsStatusPieChart extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Exportar datos para la leyenda
+  List<Map<String, dynamic>> getStatusData() {
+    final total = data.fold<int>(0, (sum, item) => sum + item.count);
+    return data.map((item) {
+      final percentage = (item.count / total) * 100;
+      return {
+        'label': _getStatusLabel(item.status),
+        'color': _getColorForStatus(item.status),
+        'icon': _getIconForStatus(item.status),
+        'count': item.count,
+        'percentage': percentage,
+      };
+    }).toList();
   }
 }
 
@@ -437,7 +494,7 @@ class TopServicesList extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '\$${service.totalRevenue.toStringAsFixed(0)}',
+                    '\$${service.totalRevenue.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,

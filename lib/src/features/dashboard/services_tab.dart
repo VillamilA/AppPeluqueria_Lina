@@ -75,17 +75,20 @@ class _ServicesTabState extends State<ServicesTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // TÍTULO Y BOTÓN - ARRIBA EN HORIZONTAL
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Servicios',
-                style: TextStyle(
-                  color: AppColors.gold,
-                  fontSize: isMobile ? 20 : 22,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Servicios',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: isMobile ? 20 : 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              SizedBox(width: 12),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.gold,
@@ -93,14 +96,17 @@ class _ServicesTabState extends State<ServicesTab> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-                icon: Icon(Icons.grid_view),
-                label: Text('Categorías'),
+                icon: Icon(Icons.grid_view, size: 18),
+                label: Text('Categorías', style: TextStyle(fontSize: 12)),
                 onPressed: _openCategoriesPage,
               ),
             ],
           ),
-          SizedBox(height: 12),
+          SizedBox(height: 14),
+          
+          // CHIPS DE CATEGORÍAS
           if (widget.categories.isNotEmpty)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -113,6 +119,7 @@ class _ServicesTabState extends State<ServicesTab> {
                         color: localSelectedCategoryId.isEmpty
                             ? Colors.black
                             : AppColors.gold,
+                        fontSize: 11,
                       ),
                     ),
                     selected: localSelectedCategoryId.isEmpty,
@@ -134,6 +141,7 @@ class _ServicesTabState extends State<ServicesTab> {
                           color: localSelectedCategoryId == cat['_id']
                               ? Colors.black
                               : AppColors.gold,
+                          fontSize: 11,
                         ),
                       ),
                       selected: localSelectedCategoryId == cat['_id'],
@@ -151,6 +159,8 @@ class _ServicesTabState extends State<ServicesTab> {
               ),
             ),
           SizedBox(height: 16),
+          
+          // LISTA DE SERVICIOS
           Expanded(
             child: filteredServices.isEmpty
                 ? Center(

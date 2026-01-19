@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../common/dialogs/app_dialogs.dart';
+import '../../../utils/validators.dart';
 
 class ServiceFormPage extends StatefulWidget {
   final String token;
@@ -60,52 +62,60 @@ class _ServiceFormPageState extends State<ServiceFormPage> with SingleTickerProv
   }
 
   Future<void> _save() async {
-    if (nombreCtrl.text.isEmpty) {
-      _showErrorSnack('El nombre es requerido');
+    // Validar nombre del servicio
+    final nameError = FormValidators.validateServiceName(nombreCtrl.text);
+    if (nameError != null) {
+      _showErrorSnack(nameError);
       return;
     }
 
-    if (!widget.isEdit && codigoCtrl.text.isEmpty) {
-      _showErrorSnack('El código es requerido');
+    // Validar código (solo en creación)
+    if (!widget.isEdit) {
+      final codeError = FormValidators.validateServiceCode(codigoCtrl.text);
+      if (codeError != null) {
+        _showErrorSnack(codeError);
+        return;
+      }
+    }
+
+    // Validar precio
+    final priceError = FormValidators.validatePrice(precioCtrl.text);
+    if (priceError != null) {
+      _showErrorSnack(priceError);
       return;
     }
 
-    if (precioCtrl.text.isEmpty) {
-      _showErrorSnack('El precio es requerido');
+    // Validar duración
+    final durationError = FormValidators.validateDuration(duracionCtrl.text);
+    if (durationError != null) {
+      _showErrorSnack(durationError);
       return;
     }
 
-    if (duracionCtrl.text.isEmpty) {
-      _showErrorSnack('La duración es requerida');
-      return;
-    }
-
-    final precio = double.tryParse(precioCtrl.text);
-    if (precio == null || precio < 0) {
-      _showErrorSnack('El precio debe ser un número válido mayor o igual a 0');
-      return;
-    }
-
-    final duracion = int.tryParse(duracionCtrl.text);
-    if (duracion == null || duracion < 5 || duracion > 480) {
-      _showErrorSnack('La duración debe estar entre 5 y 480 minutos');
+    // Validar descripción (opcional)
+    final descError = FormValidators.validateDescription(descripcionCtrl.text);
+    if (descError != null) {
+      _showErrorSnack(descError);
       return;
     }
 
     setState(() => isSaving = true);
 
+    final precio = double.parse(precioCtrl.text);
+    final duracion = int.parse(duracionCtrl.text);
+
     final data = <String, dynamic>{
-      'nombre': nombreCtrl.text,
+      'nombre': nombreCtrl.text.trim(),
       'precio': precio,
       'duracionMin': duracion,
     };
 
     if (!widget.isEdit) {
-      data['codigo'] = codigoCtrl.text;
+      data['codigo'] = codigoCtrl.text.trim().toUpperCase();
     }
 
     if (descripcionCtrl.text.isNotEmpty) {
-      data['descripcion'] = descripcionCtrl.text;
+      data['descripcion'] = descripcionCtrl.text.trim();
     }
 
     if (widget.isEdit || activo != true) {
@@ -198,13 +208,32 @@ class _ServiceFormPageState extends State<ServiceFormPage> with SingleTickerProv
                           ],
                         ),
                         SizedBox(height: 16),
-                        _buildTextField(nombreCtrl, 'Nombre del Servicio *', Icons.label),
+                        _buildTextField(
+                          nombreCtrl,
+                          'Nombre del Servicio *',
+                          Icons.label,
+                          maxLength: 30,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-záéíóúñA-ZÁÉÍÓÚÑ\s&\-\.]'),
+                            ),
+                          ],
+                        ),
                         SizedBox(height: 12),
                         _buildTextField(
                           codigoCtrl,
-                          'Código *',
+                          'Código * (máx 7 caracteres)',
                           Icons.qr_code,
                           enabled: !widget.isEdit,
+                          maxLength: 7,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[A-Za-z0-9]'),
+                            ),
+                            TextInputFormatter.withFunction((oldValue, newValue) {
+                              return newValue.copyWith(text: newValue.text.toUpperCase());
+                            }),
+                          ],
                         ),
                         if (widget.isEdit) ...[
                           SizedBox(height: 8),
@@ -214,7 +243,13 @@ class _ServiceFormPageState extends State<ServiceFormPage> with SingleTickerProv
                           ),
                         ],
                         SizedBox(height: 12),
-                        _buildTextField(descripcionCtrl, 'Descripción (opcional)', Icons.description, maxLines: 3),
+                        _buildTextField(
+                          descripcionCtrl,
+                          'Descripción (opcional)',
+                          Icons.description,
+                          maxLines: 3,
+                          maxLength: 500,
+                        ),
                       ],
                     ),
                   ),
@@ -249,16 +284,24 @@ class _ServiceFormPageState extends State<ServiceFormPage> with SingleTickerProv
                         SizedBox(height: 16),
                         _buildTextField(
                           precioCtrl,
-                          'Precio *',
+                          'Precio * (solo números)',
                           Icons.monetization_on,
                           keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}'),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 12),
                         _buildTextField(
                           duracionCtrl,
-                          'Duración en minutos *',
+                          'Duración en minutos * (solo números)',
                           Icons.schedule,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                         ),
                         SizedBox(height: 8),
                         Text(
@@ -354,17 +397,22 @@ class _ServiceFormPageState extends State<ServiceFormPage> with SingleTickerProv
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       keyboardType: keyboardType,
       enabled: enabled,
+      inputFormatters: inputFormatters,
       style: TextStyle(color: enabled ? Colors.white : Colors.grey[600], fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.gold.withOpacity(enabled ? 0.7 : 0.3), size: 20),
+        counterText: '', // Oculta el contador si hay maxLength
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey[700]!, width: 1),

@@ -41,9 +41,9 @@ class _StylistCatalogsTabState extends State<StylistCatalogsTab> {
 
       print('📚 Cargando catálogos del estilista: ${widget.stylistId}');
 
+      // Nota: getStylistCatalogs NO requiere autenticación (endpoint público)
       final response = await _stylistsApi.getStylistCatalogs(
         stylistId: widget.stylistId,
-        token: widget.token,
       );
 
       print('📥 Response Status: ${response.statusCode}');
@@ -253,11 +253,8 @@ class _StylistCatalogsTabState extends State<StylistCatalogsTab> {
   Widget _buildCatalogCard(Map<String, dynamic> catalog) {
     final nombre = catalog['nombre'] ?? catalog['name'] ?? 'Sin nombre';
     final descripcion = catalog['descripcion'] ?? catalog['description'] ?? '';
-    final precio = catalog['precio'] ?? catalog['price'] ?? 0;
-    final duracion = catalog['duracion'] ?? catalog['duration'] ?? 0;
-    final categoria = catalog['categoria'] ?? catalog['category'] ?? '';
     final activo = catalog['activo'] ?? catalog['active'] ?? true;
-    final imagenUrl = catalog['imagenUrl'] ?? catalog['imageUrl'] ?? '';
+    final services = catalog['services'] as List? ?? [];
 
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -271,30 +268,12 @@ class _StylistCatalogsTabState extends State<StylistCatalogsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen si existe
-          if (imagenUrl.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                imagenUrl,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 150,
-                    color: Colors.grey.shade700,
-                    child: Icon(Icons.image_not_supported, color: AppColors.gray, size: 40),
-                  );
-                },
-              ),
-            ),
-          
           Padding(
             padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Encabezado del catálogo
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -326,84 +305,143 @@ class _StylistCatalogsTabState extends State<StylistCatalogsTab> {
                       ),
                   ],
                 ),
-                
-                if (categoria.isNotEmpty) ...[
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: AppColors.gold.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      categoria,
-                      style: TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
 
                 if (descripcion.isNotEmpty) ...[
-                  SizedBox(height: 12),
+                  SizedBox(height: 8),
                   Text(
                     descripcion,
                     style: TextStyle(
                       color: AppColors.gray,
-                      fontSize: 14,
+                      fontSize: 13,
                       height: 1.4,
                     ),
                   ),
                 ],
-                
-                SizedBox(height: 16),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildInfoChip(
-                        Icons.attach_money,
-                        '\$${precio.toStringAsFixed(2)}',
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: _buildInfoChip(
-                        Icons.access_time,
-                        '$duracion min',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildInfoChip(IconData icon, String text) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade700,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: AppColors.gold, size: 16),
-          SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              color: AppColors.gold,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+                SizedBox(height: 12),
+
+                // Servicios dentro del catálogo
+                if (services.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Sin servicios asignados',
+                      style: TextStyle(
+                        color: AppColors.gray,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Servicios (${services.length})',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      ...services.map((service) {
+                        final serviceName = service['nombre'] ?? 'Sin nombre';
+                        final precio = service['precio'] ?? 0;
+                        final duracion = service['duracionMin'] ?? 0;
+                        final servicioActivo = service['activo'] ?? true;
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade700,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: servicioActivo
+                                  ? AppColors.gold.withOpacity(0.2)
+                                  : Colors.red.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      serviceName,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.attach_money,
+                                          color: AppColors.gold,
+                                          size: 12,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          '\$$precio',
+                                          style: TextStyle(
+                                            color: AppColors.gold,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Icon(
+                                          Icons.access_time,
+                                          color: AppColors.gold,
+                                          size: 12,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          '${duracion}min',
+                                          style: TextStyle(
+                                            color: AppColors.gold,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!servicioActivo)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text(
+                                    'OFF',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+              ],
             ),
           ),
         ],

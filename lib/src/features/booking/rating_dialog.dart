@@ -165,11 +165,20 @@ class _RatingDialogState extends State<RatingDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+    
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 12 : 16,
+        vertical: isSmallScreen ? 12 : 24,
+      ),
       child: Container(
-        constraints: BoxConstraints(maxWidth: 450),
+        constraints: BoxConstraints(
+          maxWidth: isSmallScreen ? screenWidth - 24 : 450,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         decoration: BoxDecoration(
           color: AppColors.charcoal,
           borderRadius: BorderRadius.circular(20),
@@ -180,7 +189,7 @@ class _RatingDialogState extends State<RatingDialog> {
           children: [
             // HEADER
             Container(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(isSmallScreen ? 14 : 20),
               decoration: BoxDecoration(
                 color: AppColors.charcoal,
                 borderRadius: BorderRadius.only(
@@ -197,191 +206,272 @@ class _RatingDialogState extends State<RatingDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Califica tu servicio',
-                        style: TextStyle(
-                          color: AppColors.gold,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Califica tu servicio',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontSize: isSmallScreen ? 16 : 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        widget.stylistName,
-                        style: TextStyle(
-                          color: AppColors.gray,
-                          fontSize: 13,
+                        SizedBox(height: 4),
+                        Text(
+                          widget.stylistName,
+                          style: TextStyle(
+                            color: AppColors.gray,
+                            fontSize: isSmallScreen ? 11 : 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.close, color: AppColors.gold),
+                    icon: Icon(Icons.close, color: AppColors.gold, size: 24),
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(minWidth: 40, minHeight: 40),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
             ),
 
-            // CONTENIDO
-            Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Servicio: ${widget.serviceName}',
-                    style: TextStyle(
-                      color: AppColors.gray,
-                      fontSize: 13,
-                    ),
-                  ),
-                  SizedBox(height: 24),
-
-                  // SELECTOR DE ESTRELLAS
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          '¿Qué te pareció?',
-                          style: TextStyle(
-                            color: AppColors.gold,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+            // CONTENIDO SCROLLABLE
+            Flexible(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Servicio
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.gold.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.gold.withOpacity(0.2),
                           ),
                         ),
-                        SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (index) {
-                            final isFilled = index < _stars;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() => _stars = index + 1);
-                              },
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 8),
-                                child: Icon(
-                                  isFilled ? Icons.star : Icons.star_outline,
+                        child: Row(
+                          children: [
+                            Icon(Icons.cut, color: AppColors.gold, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.serviceName,
+                                style: TextStyle(
                                   color: AppColors.gold,
-                                  size: 48,
+                                  fontSize: isSmallScreen ? 12 : 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: isSmallScreen ? 16 : 24),
+
+                      // SELECTOR DE ESTRELLAS
+                      Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              '¿Qué te pareció?',
+                              style: TextStyle(
+                                color: AppColors.gold,
+                                fontSize: isSmallScreen ? 14 : 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: isSmallScreen ? 12 : 16),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: isSmallScreen ? 6 : 8,
+                              children: List.generate(5, (index) {
+                                final isFilled = index < _stars;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() => _stars = index + 1);
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: isFilled
+                                          ? AppColors.gold.withOpacity(0.15)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      isFilled
+                                          ? Icons.star
+                                          : Icons.star_outline,
+                                      color: AppColors.gold,
+                                      size: isSmallScreen ? 36 : 48,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                            SizedBox(height: 12),
+                            if (_stars > 0)
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gold.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _getStarLabel(_stars),
+                                  style: TextStyle(
+                                    color: AppColors.gold,
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            );
-                          }),
-                        ),
-                        SizedBox(height: 8),
-                        if (_stars > 0)
-                          Text(
-                            _getStarLabel(_stars),
-                            style: TextStyle(
-                              color: AppColors.gold,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // CAMPO DE COMENTARIO
-                  Text(
-                    'Comentario (opcional)',
-                    style: TextStyle(
-                      color: AppColors.gold,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  TextField(
-                    controller: _comentarioCtrl,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Cuéntanos tu experiencia...',
-                      hintStyle: TextStyle(color: AppColors.gray),
-                      filled: true,
-                      fillColor: Colors.grey.shade800,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.gold.withOpacity(0.3),
+                          ],
                         ),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.gold.withOpacity(0.3),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
+
+                      SizedBox(height: isSmallScreen ? 16 : 24),
+
+                      // CAMPO DE COMENTARIO
+                      Text(
+                        'Comentario (opcional)',
+                        style: TextStyle(
                           color: AppColors.gold,
-                          width: 2,
+                          fontSize: isSmallScreen ? 12 : 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    style: TextStyle(color: AppColors.gold),
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // BOTONES
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.gold,
-                            side: BorderSide(color: AppColors.gold, width: 2),
-                            padding: EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      SizedBox(height: 8),
+                      TextField(
+                        controller: _comentarioCtrl,
+                        maxLines: 3,
+                        maxLength: 300,
+                        decoration: InputDecoration(
+                          hintText: 'Cuéntanos tu experiencia...',
+                          hintStyle: TextStyle(
+                            color: AppColors.gray,
+                            fontSize: isSmallScreen ? 12 : 13,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade800,
+                          counterText: '',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.gold.withOpacity(0.3),
                             ),
                           ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(
-                            'Cancelar',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.gold.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.gold,
+                              width: 2,
+                            ),
                           ),
                         ),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 12 : 13,
+                        ),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.gold,
-                            foregroundColor: Colors.black,
-                            padding: EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _loading ? null : _submitRating,
-                          child: _loading
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.black,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  'Enviar',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+
+                      SizedBox(height: isSmallScreen ? 16 : 24),
+
+                      // BOTONES
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.gold,
+                                side: BorderSide(
+                                  color: AppColors.gold,
+                                  width: 2,
                                 ),
-                        ),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 12 : 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text(
+                                'Cancelar',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isSmallScreen ? 12 : 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.gold,
+                                foregroundColor: Colors.black,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 12 : 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _loading ? null : _submitRating,
+                              child: _loading
+                                  ? SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.black,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Enviar',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: isSmallScreen ? 12 : 13,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ],

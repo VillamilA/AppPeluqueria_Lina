@@ -9,6 +9,31 @@ class UsersApi {
   Future<http.Response> listUsers() async =>
       await _client.get('/api/v1/users');
 
+  /// Obtener todos los usuarios con paginación y filtros
+  /// GET /api/v1/users?page=1&limit=50&role=CLIENTE&isActive=true
+  Future<http.Response> listAllUsers({
+    required String token,
+    int page = 1,
+    int limit = 50,
+    String? role,
+    bool? isActive,
+  }) async {
+    String url = '/api/v1/users?page=$page&limit=$limit';
+    if (role != null && role.isNotEmpty && role != 'ALL') {
+      url += '&role=$role';
+    }
+    if (isActive != null) {
+      url += '&isActive=$isActive';
+    }
+    
+    print('📋 UsersApi.listAllUsers: GET $url');
+    
+    return await _client.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   Future<http.Response> getUser(String userId, {String? token}) async =>
       await _client.get('/api/v1/users/$userId', headers: token != null ? {'Authorization': 'Bearer $token'} : null);
 

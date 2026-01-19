@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import '../../core/theme/app_theme.dart';
 import '../../api/api_client.dart';
 import '../../api/bookings_api.dart';
 import 'widgets/stylists_selection_card.dart';
 import 'widgets/scrollable_week_calendar.dart';
 import 'package:intl/intl.dart';
+import '../../services/notification_service.dart';
 
 class BookingFlowPage extends StatefulWidget {
   final dynamic service;
@@ -42,12 +44,39 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
   @override
   void initState() {
     super.initState();
+    print('🔵 [BOOKING_FLOW] initState - Servicio: ${widget.service['nombre']}');
+    print('🔵 [BOOKING_FLOW] Total estilistas disponibles: ${widget.stylists.length}');
+    
+    // Solicitar permisos de notificación
+    _requestNotificationPermissions();
+    
     // Si viene con targetStylistId (gerente/admin), seleccionar automáticamente
     if (widget.targetStylistId != null) {
+      print('🔵 [BOOKING_FLOW] targetStylistId recibido: ${widget.targetStylistId}');
       _selectedStylist = widget.stylists.firstWhere(
         (s) => s['_id'] == widget.targetStylistId,
-        orElse: () => null,
+        orElse: () {
+          print('❌ [BOOKING_FLOW] No se encontró estilista con ID: ${widget.targetStylistId}');
+          return null;
+        },
       );
+      print('🔵 [BOOKING_FLOW] _selectedStylist después de buscar: $_selectedStylist');
+    } else {
+      print('🔵 [BOOKING_FLOW] Sin targetStylistId (cliente eligiendo)');
+    }
+  }
+  
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      final notificationService = NotificationService();
+      final hasPermission = await notificationService.requestPermissions();
+      if (hasPermission) {
+        print('✅ [BOOKING_FLOW] Permisos de notificación otorgados');
+      } else {
+        print('⚠️ [BOOKING_FLOW] Permisos de notificación denegados');
+      }
+    } catch (e) {
+      print('❌ [BOOKING_FLOW] Error al solicitar permisos: $e');
     }
   }
 
@@ -93,60 +122,130 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
   }
 
   Future<void> _loadAvailableSlots(DateTime date) async {
+    print('═══════════════════════════════════════');
+    print('🟠 [_LOAD_SLOTS] INICIANDO CARGA DE SLOTS');
+    print('═══════════════════════════════════════');
+    print('📅 Fecha seleccionada: $date');
+    print('📋 Servicio: ${widget.service['nombre']} (ID: ${widget.service['_id']})');
+    print('👤 _selectedStylist al inicio: $_selectedStylist');
+    print('👤 _selectedStylist.nombre: ${_selectedStylist?['nombre']}');
+    print('👤 _selectedStylist._id: ${_selectedStylist?['_id']}');
+
+    // ✅ VALIDACIÓN DEFENSIVA: No cargar slots si no hay estilista seleccionado
     if (_selectedStylist == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor selecciona un estilista'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      print('❌ [VALIDACIÓN FALLIDA] _selectedStylist es NULL');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Por favor selecciona un estilista primero'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      print('═══════════════════════════════════════');
+      return; // ← DETENER AQUÍ, NO CONTINUAR
+    }
+    print('✅ [VALIDACIÓN 1] _selectedStylist existe');
+
+    // ✅ GUARDIANES ADICIONALES
+    if (!mounted) {
+      print('❌ Widget NO está montado');
       return;
     }
+    print('✅ [VALIDACIÓN 2] Widget está montado');
+    
+    final stylistId = _selectedStylist?['_id'];
+    print('🔍 stylistId extraido: $stylistId (type: ${stylistId.runtimeType})');
+
+    if (stylistId == null || stylistId.isEmpty) {
+      print('❌ [VALIDACIÓN FALLIDA] stylistId es null o vacío. selectedStylist: $_selectedStylist');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Error: ID del estilista no válido'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('═══════════════════════════════════════');
+      return;
+    }
+    print('✅ [VALIDACIÓN 3] stylistId válido: $stylistId');
 
     setState(() => _loadingSlots = true);
     try {
       final dateString =
           "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       final serviceId = widget.service['_id'];
+      
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🚀 LLAMANDO A API CON:');
+      print('   serviceId=$serviceId (type: ${serviceId.runtimeType})');
+      print('   stylistId=$stylistId (type: ${stylistId.runtimeType})');
+      print('   dateString=$dateString');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await BookingsApi(ApiClient.instance).getSlots(
         serviceId: serviceId,
+        stylistId: stylistId,
         date: dateString,
       );
+
+      print('✅ [API_RESPONSE] Status Code: ${response.statusCode}');
+      print('✅ [API_RESPONSE] Body (primeros 200 chars): ${response.body.substring(0, math.min(200, response.body.length))}');
+
+      if (!mounted) {
+        print('❌ Widget no está montado después de API');
+        return; // ← DETENER SI LA PANTALLA FUE CERRADA
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final slots = data is List ? data : (data['data'] ?? []);
+        
+        print('✅ [SUCCESS] Slots cargados: ${slots.length}');
+        if (slots.isNotEmpty) {
+          print('   Primer slot: ${slots[0]}');
+        }
 
         setState(() {
           _availableSlots = slots.cast<dynamic>();
           _selectedSlotId = null;
+          print('✅ setState completado. _availableSlots.length: ${_availableSlots.length}');
         });
       } else {
+        print('❌ [ERROR] Status ${response.statusCode}: ${response.body}');
         setState(() => _availableSlots = []);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No hay horarios disponibles para esta fecha'),
-              backgroundColor: Colors.orange,
+            SnackBar(
+              content: Text('❌ Error ${response.statusCode}: No hay horarios disponibles'),
+              backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
-      print('Error loading slots: $e');
+      print('❌ [EXCEPTION] Error al cargar slots: $e');
+      print('   Stack trace: ${StackTrace.current}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al cargar horarios: $e'),
+            content: Text('❌ Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      setState(() => _loadingSlots = false);
+      if (mounted) {
+        setState(() => _loadingSlots = false);
+        print('✅ _loadingSlots = false');
+      }
     }
+    print('═══════════════════════════════════════');
   }
+
 
   String _formatTime(dynamic timeData) {
     try {
@@ -191,17 +290,128 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
       );
 
       if (response.statusCode == 201) {
+        final bookingData = jsonDecode(response.body);
+        
+        print('📝 [BOOKING_FLOW] Respuesta de reserva: $bookingData');
+        
+        // Extraer información de la respuesta
+        final inicio = bookingData['inicio'] ?? '';
+        final serviceName = widget.service['nombre'] ?? 'Servicio';
+        
+        // Obtener nombre del estilista de forma confiable
+        String stylistName = _selectedStylist?['nombre'] ?? '';
+        if (stylistName.isEmpty && bookingData['estilista'] != null) {
+          final estilista = bookingData['estilista'];
+          if (estilista is Map) {
+            stylistName = '${estilista['nombre'] ?? ''} ${estilista['apellido'] ?? ''}'.trim();
+          }
+        }
+        if (stylistName.isEmpty) {
+          stylistName = 'Estilista';
+        }
+        
+        print('👤 [BOOKING_FLOW] Estilista: $stylistName');
+        print('🕐 [BOOKING_FLOW] Inicio: $inicio');
+        
+        // Formatear hora
+        String timeDisplay = 'Hora';
+        if (inicio.isNotEmpty) {
+          // Manejar formato ISO (2024-01-18T10:30:00Z) o HH:mm
+          if (inicio.contains('T')) {
+            try {
+              final dateTime = DateTime.parse(inicio);
+              timeDisplay = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+            } catch (e) {
+              print('❌ [BOOKING_FLOW] Error parsing hora: $e');
+              if (inicio.contains(':')) {
+                timeDisplay = inicio.substring(0, 5);
+              }
+            }
+          } else if (inicio.contains(':')) {
+            timeDisplay = inicio.substring(0, 5);
+          }
+        }
+        
+        print('✅ [BOOKING_FLOW] Hora formateada: $timeDisplay');
+        
+        // Extraer la fecha de la reserva para la notificación
+        DateTime bookingDate = DateTime.now();
+        if (inicio.isNotEmpty) {
+          try {
+            if (inicio.contains('T')) {
+              bookingDate = DateTime.parse(inicio);
+            }
+          } catch (e) {
+            print('⚠️ [BOOKING_FLOW] Error parsing fecha: $e, usando hoy');
+          }
+        }
+        
+        // Enviar notificación con la fecha correcta
+        _sendBookingNotification(serviceName, stylistName, timeDisplay, bookingDate);
+        
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('¡Cita creada exitosamente!'),
-              backgroundColor: Colors.green,
+          // Mostrar diálogo de éxito
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  SizedBox(width: 12),
+                  Text('¡Cita Confirmada!'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  _buildSummaryRowForDialog('Servicio:', serviceName),
+                  const SizedBox(height: 12),
+                  _buildSummaryRowForDialog('Estilista:', stylistName),
+                  const SizedBox(height: 12),
+                  _buildSummaryRowForDialog('Hora:', timeDisplay),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Te recordamos tu cita. Presenta puntualidad.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Cerrar diálogo
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        // Regresar al dashboard (2 pops: página de booking + página anterior)
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop();
+                      }
+                    });
+                  },
+                  child: const Text('Aceptar'),
+                ),
+              ],
             ),
           );
-          // Volver a la página anterior
-          Future.delayed(const Duration(seconds: 1), () {
-            if (mounted) Navigator.of(context).pop();
-          });
         }
       } else {
         final errorData = jsonDecode(response.body);
@@ -379,11 +589,14 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
                     isSelected: isSelected,
                     workDays: workDaysForThisStylist,
                     onTap: () {
+                      print('✅ [STYLIST_SELECT] Usuario seleccionó: ${stylist['nombre']} ${stylist['apellido']}');
+                      print('✅ [STYLIST_SELECT] Stylist ID: ${stylist['_id']}');
                       setState(() {
                         _selectedStylist = stylist;
                         _selectedDate = null;
                         _selectedSlotId = null;
                         _availableSlots = [];
+                        print('✅ [STYLIST_SELECT] After setState - _selectedStylist: ${_selectedStylist?['nombre']} (ID: ${_selectedStylist?['_id']})');
                       });
                     },
                   );
@@ -418,6 +631,24 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
                 selectedDate: _selectedDate,
                 workDays: workDays,
                 onDateSelected: (date) {
+                  print('📅 [CALENDAR] Usuario seleccionó fecha: $date');
+                  print('📅 [CALENDAR] _selectedStylist ANTES de cargar: $_selectedStylist');
+                  print('📅 [CALENDAR] _selectedStylist._id: ${_selectedStylist?['_id']}');
+                  
+                  if (_selectedStylist == null) {
+                    print('❌ [CALENDAR] ERROR: No hay estilista seleccionado');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('⚠️ Debes seleccionar un estilista primero'),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  
                   setState(() {
                     _selectedDate = date;
                     _selectedSlotId = null;
@@ -702,4 +933,53 @@ class _BookingFlowPageState extends State<BookingFlowPage> {
       ),
     );
   }
-}
+
+  Widget _buildSummaryRowForDialog(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _sendBookingNotification(
+    String serviceName,
+    String stylistName,
+    String timeDisplay,
+    DateTime bookingDate,
+  ) async {
+    try {
+      print('📲 Enviando notificación de cita confirmada');
+      final notificationService = NotificationService();
+      
+      // Usar la fecha de la reserva
+      final dateFormat = DateFormat('EEEE, d MMMM', 'es_ES');
+      final dateStr = dateFormat.format(bookingDate);
+      
+      await notificationService.notifyClientBookingCreated(
+        stylistName: stylistName,
+        date: dateStr,
+        time: timeDisplay,
+      );
+      
+      print('✅ Notificación enviada correctamente');
+    } catch (e) {
+      print('❌ Error al enviar notificación: $e');
+    }
+  }}

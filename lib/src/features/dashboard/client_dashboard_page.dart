@@ -288,33 +288,6 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
-                // Barra de búsqueda mejorada
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.gold.withOpacity(0.15),
-                      width: 1,
-                    ),
-                  ),
-                  child: TextField(
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Buscar servicios, estilistas...',
-                      hintStyle: TextStyle(
-                        color: AppColors.gray.withOpacity(0.6),
-                        fontSize: 14,
-                      ),
-                      filled: false,
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      prefixIcon: Icon(Icons.search, color: AppColors.gold, size: 22),
-                      suffixIcon: Icon(Icons.tune, color: AppColors.gold.withOpacity(0.5), size: 20),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

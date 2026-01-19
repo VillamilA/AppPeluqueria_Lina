@@ -5,15 +5,16 @@ class BookingsApi {
   final ApiClient _client;
   BookingsApi(this._client);
 
-  /// Obtener slots disponibles para un servicio en una fecha
-  /// GET /api/v1/bookings/availability?date=YYYY-MM-DD&serviceId=ID
+  /// Obtener slots disponibles para un servicio y estilista en una fecha
+  /// GET /api/v1/bookings/availability?date=YYYY-MM-DD&serviceId=ID&stylistId=ID
   /// Retorna un array directo de slots: [{ slotId, stylistId, stylistName, start, end }, ...]
   /// NO REQUIERE autenticación (público)
   Future<http.Response> getSlots({
     required String serviceId,
+    required String stylistId,
     required String date,
   }) async {
-    String path = '/api/v1/bookings/availability?date=$date&serviceId=$serviceId';
+    String path = '/api/v1/bookings/availability?date=$date&serviceId=$serviceId&stylistId=$stylistId';
     print('📍 BookingsApi.getSlots: $path');
     return await _client.get(path);
   }
@@ -37,10 +38,10 @@ class BookingsApi {
       await _client.get('/api/v1/bookings/$bookingId');
 
   Future<http.Response> confirmBooking(String bookingId) async =>
-      await _client.post('/api/v1/bookings/$bookingId/confirm');
+      await _client.patch('/api/v1/bookings/$bookingId/confirm');
 
-  Future<http.Response> completeBooking(String bookingId) async =>
-      await _client.post('/api/v1/bookings/$bookingId/complete');
+  Future<http.Response> completeBooking(String bookingId, {required Map<String, dynamic> data, required String token}) async =>
+      await _client.patch('/api/v1/bookings/$bookingId/complete', body: data, headers: {'Authorization': 'Bearer $token'});
 
   Future<http.Response> cancelBooking(String bookingId, {Map<String, dynamic>? data, String? token}) async =>
       await _client.post('/api/v1/bookings/$bookingId/cancel', body: data, headers: token != null ? {'Authorization': 'Bearer $token'} : null);

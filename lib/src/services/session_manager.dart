@@ -50,7 +50,7 @@ class SessionManager {
     _inactivityTimer?.cancel();
     
     _inactivityTimer = Timer(_inactivityTimeout, () {
-      print('[SESSION_MANAGER] 20 minutos de inactividad detectados');
+      print('[SESSION_MANAGER] 15 minutos de inactividad detectados');
       _showSessionExpiredDialog();
     });
   }
@@ -127,7 +127,7 @@ class SessionManager {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tu sesión se cerró por inactividad después de 20 minutos sin actividad.',
+                'Tu sesión se cerró por inactividad después de 15 minutos sin actividad.',
                 style: TextStyle(
                   color: Color(0xFFCCCCCC),
                   fontSize: 15,

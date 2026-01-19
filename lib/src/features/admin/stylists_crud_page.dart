@@ -483,6 +483,7 @@ class _StylistsCrudPageState extends State<StylistsCrudPage> {
         title: Text('Gestión de Estilistas', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.charcoal,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.gold),
       ),
       body: Column(
         children: [

@@ -148,6 +148,7 @@ class _RatingsManagementPageState extends State<RatingsManagementPage> {
         ),
         backgroundColor: AppColors.charcoal,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.gold),
       ),
       body: loading
           ? Center(child: CircularProgressIndicator(color: AppColors.gold))

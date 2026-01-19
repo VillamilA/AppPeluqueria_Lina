@@ -616,8 +616,8 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
               child: Column(
                 children: [
                   BookingsStatusPieChart(data: _summaryReport!.bookingsByStatus),
-                  const SizedBox(height: 16),
-                  _buildStatusLegend(),
+                  const SizedBox(height: 24),
+                  _buildEnhancedStatusLegend(_summaryReport!.bookingsByStatus),
                 ],
               ),
             ),
@@ -660,7 +660,7 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
       spacing: 12,
       runSpacing: 12,
       children: [
-        _buildKpiCard('Ingresos Totales', '\$${_summaryReport!.totals.totalRevenue.toStringAsFixed(0)}', Icons.attach_money_rounded, Colors.green),
+        _buildKpiCard('Ingresos Totales', '\$${_summaryReport!.totals.totalRevenue.toStringAsFixed(2)}', Icons.attach_money_rounded, Colors.green),
         _buildKpiCard('Citas Pagadas', '${_summaryReport!.totals.totalPaidBookings}', Icons.check_circle_rounded, Colors.blue),
       ],
     );
@@ -750,7 +750,7 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
               children: [
                 Icon(Icons.attach_money, size: 14, color: Colors.grey[400]),
                 const SizedBox(width: 4),
-                Text('\$${stylist.earnings.totalRevenue.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[300])),
+                Text('\$${stylist.earnings.totalRevenue.toStringAsFixed(2)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[300])),
                 const SizedBox(width: 16),
                 Icon(Icons.star, size: 14, color: Colors.grey[400]),
                 const SizedBox(width: 4),
@@ -777,7 +777,7 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
           runSpacing: 12,
           children: [
             _buildSmallKpi('Citas', '${stylist.earnings.paidBookings}', Icons.event_available),
-            _buildSmallKpi('Ticket', '\$${stylist.earnings.avgTicket.toStringAsFixed(0)}', Icons.receipt_long),
+            _buildSmallKpi('Ticket', '\$${stylist.earnings.avgTicket.toStringAsFixed(2)}', Icons.receipt_long),
             _buildSmallKpi('Clientes', '${stylist.extra.uniqueClients}', Icons.people),
           ],
         ),
@@ -914,35 +914,122 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
     );
   }
 
-  Widget _buildStatusLegend() {
-    final statuses = [
-      {'label': 'Completado', 'color': Colors.green, 'icon': Icons.check_circle},
-      {'label': 'Pendiente', 'color': Colors.orange, 'icon': Icons.schedule},
-      {'label': 'Cancelado', 'color': Colors.red, 'icon': Icons.cancel},
-    ];
+  Widget _buildEnhancedStatusLegend(List<BookingByStatus> data) {
+    // Crear mapa de colores y etiquetas consistentes con el gráfico
+    final colorMap = {
+      'COMPLETED': Color(0xFF10B981),
+      'CANCELLED': Color(0xFFEF4444),
+      'NO_SHOW': Color(0xFFF59E0B),
+      'PENDING': Color(0xFF3B82F6),
+      'CONFIRMED': Color(0xFF8B5CF6),
+      'IN_PROGRESS': Color(0xFF06B6D4),
+    };
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      alignment: WrapAlignment.center,
-      children: statuses.map((status) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: (status['color'] as Color).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: (status['color'] as Color).withOpacity(0.3)),
+    final labelMap = {
+      'COMPLETED': 'Completado',
+      'CANCELLED': 'Cancelado',
+      'NO_SHOW': 'No Presentado',
+      'PENDING': 'Pendiente',
+      'CONFIRMED': 'Confirmado',
+      'IN_PROGRESS': 'En Progreso',
+    };
+
+    final iconMap = {
+      'COMPLETED': Icons.check_circle,
+      'CANCELLED': Icons.cancel,
+      'NO_SHOW': Icons.no_accounts,
+      'PENDING': Icons.schedule,
+      'CONFIRMED': Icons.verified,
+      'IN_PROGRESS': Icons.hourglass_bottom,
+    };
+
+    final total = data.fold<int>(0, (sum, item) => sum + item.count);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gold.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Desglose por Estado',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppColors.gold,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(status['icon'] as IconData, size: 14, color: status['color'] as Color),
-              const SizedBox(width: 6),
-              Text(status['label'] as String, style: TextStyle(fontSize: 12, color: status['color'] as Color, fontWeight: FontWeight.w600)),
-            ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: data.map((item) {
+              final label = labelMap[item.status] ?? item.status;
+              final color = colorMap[item.status] ?? Colors.grey;
+              final icon = iconMap[item.status] ?? Icons.circle;
+              final percentage = (item.count / total) * 100;
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 16,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              '${item.count} citas (${percentage.toStringAsFixed(1)}%)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 }

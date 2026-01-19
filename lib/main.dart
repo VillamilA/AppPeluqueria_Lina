@@ -38,8 +38,33 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _requestNotificationPermissionsOnAppStart();
+  }
+
+  Future<void> _requestNotificationPermissionsOnAppStart() async {
+    try {
+      final notificationService = NotificationService();
+      final hasPermission = await notificationService.requestPermissions();
+      if (hasPermission) {
+        print('✅ [MAIN] Permisos de notificación otorgados al iniciar app');
+      } else {
+        print('⚠️ [MAIN] Permisos de notificación denegados al iniciar app');
+      }
+    } catch (e) {
+      print('❌ [MAIN] Error al solicitar permisos en startup: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

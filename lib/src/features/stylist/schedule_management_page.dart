@@ -5,6 +5,7 @@ import '../../api/slots_api.dart';
 import '../../api/services_api.dart';
 import '../../api/api_client.dart';
 import '../../data/models/schedule_models.dart';
+import '../../services/business_hours_service.dart';
 import 'dart:convert';
 
 class ScheduleManagementPage extends StatefulWidget {
@@ -26,11 +27,15 @@ class ScheduleManagementPage extends StatefulWidget {
 class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
   late SlotsApi _slotsApi;
   late ServicesApi _servicesApi;
+  late BusinessHoursService _businessHoursService;
   
   // PASO 1: Horarios base
   final Map<int, bool> _dayEnabled = {};
   final Map<int, TimeOfDay> _dayStartTime = {};
   final Map<int, TimeOfDay> _dayEndTime = {};
+  
+  // Horario del negocio (para validación)
+  Map<int, BusinessHours>? _businessHours;
   
   // PASO 2: Slots generados
   List<AvailabilitySlot> _generatedSlots = [];
@@ -56,8 +61,48 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
     super.initState();
     _slotsApi = SlotsApi(ApiClient.instance);
     _servicesApi = ServicesApi(ApiClient.instance);
+    _businessHoursService = BusinessHoursService();
+    _businessHoursService.initialize();
     _initializeDays();
+    _loadBusinessHours();
     _loadServices();
+  }
+
+  /// 📍 Cargar horarios del negocio
+  Future<void> _loadBusinessHours() async {
+    try {
+      print('📥 [ESTILISTA] Cargando horarios del negocio...');
+      final hours = await _businessHoursService.getBusinessHours();
+      
+      setState(() {
+        _businessHours = hours;
+      });
+
+      print('✅ [ESTILISTA] ${hours.length} días con horario del negocio');
+      
+      // Si el negocio tiene horarios, actualizar los default del estilista
+      for (var entry in hours.entries) {
+        if (!_dayStartTime.containsKey(entry.key)) {
+          final (openHour, openMin) = entry.value.getOpenTimeComponents();
+          final (closeHour, closeMin) = entry.value.getCloseTimeComponents();
+          
+          _dayStartTime[entry.key] = TimeOfDay(hour: openHour, minute: openMin);
+          _dayEndTime[entry.key] = TimeOfDay(hour: closeHour, minute: closeMin);
+        }
+      }
+    } catch (e) {
+      print('❌ [ESTILISTA] Error cargando horarios del negocio: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ No se pudo cargar horarios del negocio: $e'),
+            backgroundColor: Colors.orange.shade600,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _initializeDays() {
@@ -66,6 +111,48 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
       _dayStartTime[i] = TimeOfDay(hour: 9, minute: 0);
       _dayEndTime[i] = TimeOfDay(hour: 18, minute: 0);
     }
+  }
+
+  /// ✅ VALIDAR QUE EL HORARIO ESTÉ DENTRO DEL RANGO DEL NEGOCIO
+  Future<String?> _validateTimeRangeWithBusinessHours(
+    int dayOfWeek,
+    TimeOfDay startTime,
+    TimeOfDay endTime,
+  ) async {
+    print('🔍 [VALIDACIÓN] Iniciando validación para día $dayOfWeek');
+    print('🔍 [VALIDACIÓN] Horario estilista: ${startTime.format(context)} - ${endTime.format(context)}');
+    print('🔍 [VALIDACIÓN] _businessHours es null? ${_businessHours == null}');
+    
+    if (_businessHours == null) {
+      print('❌ [VALIDACIÓN] ERROR: Horarios del negocio no cargados');
+      return '❌ Error: Horarios del negocio no cargados. Intenta recargar la página.';
+    }
+
+    final businessHour = _businessHours![dayOfWeek];
+    print('🔍 [VALIDACIÓN] businessHour para día $dayOfWeek: ${businessHour?.openTime} - ${businessHour?.closeTime}');
+    
+    if (businessHour == null) {
+      print('❌ [VALIDACIÓN] ERROR: El negocio no atiende este día');
+      return '❌ El negocio no atiende este día';
+    }
+
+    // Validar que esté dentro del horario del negocio
+    final startTimeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+    final endTimeStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+    
+    print('🔍 [VALIDACIÓN] Llamando validateStylistHours con:');
+    print('   - dayOfWeek: $dayOfWeek');
+    print('   - startTime: $startTimeStr');
+    print('   - endTime: $endTimeStr');
+    
+    final (isValid, errorMessage) = await _businessHoursService.validateStylistHours(
+      dayOfWeek: dayOfWeek,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+    );
+
+    print('🔍 [VALIDACIÓN] Resultado: isValid=$isValid, error=$errorMessage');
+    return isValid ? null : errorMessage;
   }
 
   Future<void> _loadServices() async {
@@ -109,11 +196,42 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
   }
 
   Future<void> _saveSchedule(int dayOfWeek) async {
+    print('🟢 [ESTILISTA] ¡LLAMÓ _saveSchedule para día $dayOfWeek!');
     try {
-      if (!_dayEnabled[dayOfWeek]!) return;
+      print('🔵 [ESTILISTA] _dayEnabled[$dayOfWeek] = ${_dayEnabled[dayOfWeek]}');
+      if (!_dayEnabled[dayOfWeek]!) {
+        print('⚠️ [ESTILISTA] Día no habilitado, retornando sin guardar');
+        return;
+      }
 
       final startTime = _dayStartTime[dayOfWeek]!;
       final endTime = _dayEndTime[dayOfWeek]!;
+      print('🔵 [ESTILISTA] Tiempos: $startTime - $endTime');
+
+      // ✅ VALIDAR CONTRA HORARIOS DEL NEGOCIO
+      print('🟡 [ESTILISTA] Llamando _validateTimeRangeWithBusinessHours...');
+      final validationError = await _validateTimeRangeWithBusinessHours(
+        dayOfWeek,
+        startTime,
+        endTime,
+      );
+      print('🟡 [ESTILISTA] Resultado validación: $validationError');
+      
+      if (validationError != null) {
+        print('❌ [ESTILISTA] VALIDACIÓN FALLÓ: $validationError');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(validationError),
+              backgroundColor: Colors.red.shade600,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+      
+      print('✅ [ESTILISTA] VALIDACIÓN PASÓ, procediendo a guardar...');
 
       final scheduleData = {
         'stylistId': widget.stylistId,
@@ -430,8 +548,46 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
                       final time = await showTimePicker(
                         context: context,
                         initialTime: startTime,
+                        builder: (BuildContext context, Widget? child) {
+                          return MediaQuery(
+                            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                            child: child ?? SizedBox(),
+                          );
+                        },
                       );
                       if (time != null) {
+                        // ✅ VALIDAR QUE LA HORA ESTÉ EN EL RANGO PERMITIDO
+                        if (!_isWithinBusinessHours(time)) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('❌ La hora debe estar entre 6:00 AM y 10:00 PM'),
+                                backgroundColor: Colors.red.shade600,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        
+                        // ✅ VALIDAR QUE NO CONFLICTÚE CON LA HORA DE CIERRE
+                        final endTime = _dayEndTime[dayIndex]!;
+                        final startMinutes = time.hour * 60 + time.minute;
+                        final endMinutes = endTime.hour * 60 + endTime.minute;
+                        
+                        if (startMinutes >= endMinutes) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('❌ La hora de inicio debe ser menor a la de cierre'),
+                                backgroundColor: Colors.red.shade600,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        
                         setState(() {
                           _dayStartTime[dayIndex] = time;
                         });
@@ -483,8 +639,46 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
                       final time = await showTimePicker(
                         context: context,
                         initialTime: endTime,
+                        builder: (BuildContext context, Widget? child) {
+                          return MediaQuery(
+                            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                            child: child ?? SizedBox(),
+                          );
+                        },
                       );
                       if (time != null) {
+                        // ✅ VALIDAR QUE LA HORA ESTÉ EN EL RANGO PERMITIDO
+                        if (!_isWithinBusinessHours(time)) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('❌ La hora debe estar entre 6:00 AM y 10:00 PM'),
+                                backgroundColor: Colors.red.shade600,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        
+                        // ✅ VALIDAR QUE SEA MAYOR A LA HORA DE INICIO
+                        final startTime = _dayStartTime[dayIndex]!;
+                        final startMinutes = startTime.hour * 60 + startTime.minute;
+                        final endMinutes = time.hour * 60 + time.minute;
+                        
+                        if (endMinutes <= startMinutes) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('❌ La hora de cierre debe ser mayor a la de inicio'),
+                                backgroundColor: Colors.red.shade600,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        
                         setState(() {
                           _dayEndTime[dayIndex] = time;
                         });
@@ -977,5 +1171,30 @@ class _ScheduleManagementPageState extends State<ScheduleManagementPage> {
         ],
       ),
     );
+  }
+
+  /// ✅ VALIDAR QUE LA HORA ESTÉ DENTRO DEL RANGO DEL NEGOCIO
+  bool _isWithinBusinessHours(TimeOfDay time) {
+    if (_businessHours == null) {
+      return true; // Si no se cargaron, permitir
+    }
+    
+    // Obtener el día actual (índice)
+    final now = DateTime.now();
+    final dayOfWeek = now.weekday % 7;
+    
+    final businessHour = _businessHours![dayOfWeek];
+    if (businessHour == null) {
+      return true; // Si no hay horario para el día, permitir
+    }
+
+    // Convertir a minutos
+    final timeMinutes = time.hour * 60 + time.minute;
+    final openMinutes = int.parse(businessHour.openTime.split(':')[0]) * 60 +
+        int.parse(businessHour.openTime.split(':')[1]);
+    final closeMinutes = int.parse(businessHour.closeTime.split(':')[0]) * 60 +
+        int.parse(businessHour.closeTime.split(':')[1]);
+
+    return timeMinutes >= openMinutes && timeMinutes < closeMinutes;
   }
 }

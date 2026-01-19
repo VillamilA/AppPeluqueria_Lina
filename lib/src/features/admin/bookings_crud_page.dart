@@ -23,7 +23,7 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
   List<dynamic> categories = [];
   
   bool loading = true;
-  String filterStatus = 'all'; // 'all', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'
+  String filterStatus = 'all'; // 'all', 'SCHEDULED', 'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'
   String filterCategory = 'all'; // 'all' o id de categoría
   String selectedStylistId = 'all';
   String selectedClientId = 'all';
@@ -34,9 +34,10 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
 
   // Estadísticas
   int totalBookings = 0;
+  int scheduledCount = 0;
   int confirmedCount = 0;
-  int inProgressCount = 0;
   int completedCount = 0;
+  int noShowCount = 0;
   int cancelledCount = 0;
 
   @override
@@ -161,12 +162,13 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
 
   void _calculateStats() {
     totalBookings = bookings.length;
+    scheduledCount = bookings.where((b) => b['estado'] == 'SCHEDULED').length;
     confirmedCount = bookings.where((b) => b['estado'] == 'CONFIRMED').length;
-    inProgressCount = bookings.where((b) => b['estado'] == 'IN_PROGRESS').length;
     completedCount = bookings.where((b) => b['estado'] == 'COMPLETED').length;
+    noShowCount = bookings.where((b) => b['estado'] == 'NO_SHOW').length;
     cancelledCount = bookings.where((b) => b['estado'] == 'CANCELLED').length;
     
-    print('📊 Estadísticas: Total=$totalBookings, Confirmed=$confirmedCount, InProgress=$inProgressCount, Completed=$completedCount, Cancelled=$cancelledCount');
+    print('📊 Estadísticas: Total=$totalBookings, Scheduled=$scheduledCount, Confirmed=$confirmedCount, Completed=$completedCount, NoShow=$noShowCount, Cancelled=$cancelledCount');
   }
 
   void _applyFilter() {
@@ -227,6 +229,7 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
       context: context,
       builder: (ctx) => CancelBookingDialog(
         bookingInfo: clienteName,
+        isStylista: false,
       ),
     );
 
@@ -285,12 +288,14 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
 
   String _getStatusLabel(String? status) {
     switch (status?.toUpperCase()) {
+      case 'SCHEDULED':
+        return 'Programada';
       case 'CONFIRMED':
         return 'Confirmada';
-      case 'IN_PROGRESS':
-        return 'En Curso';
       case 'COMPLETED':
         return 'Completada';
+      case 'NO_SHOW':
+        return '❌ No Asistió';
       case 'CANCELLED':
         return 'Cancelada';
       case 'PENDING_STYLIST_CONFIRMATION':
@@ -341,12 +346,14 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'CONFIRMED':
+      case 'SCHEDULED':
         return Colors.blue;
-      case 'IN_PROGRESS':
-        return Colors.orange;
+      case 'CONFIRMED':
+        return Colors.lightBlue;
       case 'COMPLETED':
         return Colors.green;
+      case 'NO_SHOW':
+        return Colors.purple;
       case 'CANCELLED':
         return Colors.red;
       default:
@@ -383,11 +390,13 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
                     children: [
                       _buildStatChip('Total', totalBookings, AppColors.gold),
                       SizedBox(width: 8),
-                      _buildStatChip('Confirmadas', confirmedCount, Colors.blue),
+                      _buildStatChip('Programadas', scheduledCount, Colors.blue),
                       SizedBox(width: 8),
-                      _buildStatChip('En Curso', inProgressCount, Colors.orange),
+                      _buildStatChip('Confirmadas', confirmedCount, Colors.lightBlue),
                       SizedBox(width: 8),
                       _buildStatChip('Completadas', completedCount, Colors.green),
+                      SizedBox(width: 8),
+                      _buildStatChip('❌ No Asistió', noShowCount, Colors.purple),
                       SizedBox(width: 8),
                       _buildStatChip('Canceladas', cancelledCount, Colors.red),
                     ],
@@ -433,10 +442,11 @@ class _BookingsCrudPageState extends State<BookingsCrudPage> with SingleTickerPr
                             isExpanded: true,
                             items: [
                               DropdownMenuItem(value: 'all', child: Text('📋 Todas ($totalBookings)')),
+                              DropdownMenuItem(value: 'SCHEDULED', child: Text('📅 Programadas ($scheduledCount)')),
                               DropdownMenuItem(value: 'CONFIRMED', child: Text('✅ Confirmadas ($confirmedCount)')),
-                              DropdownMenuItem(value: 'IN_PROGRESS', child: Text('🔄 En Curso ($inProgressCount)')),
                               DropdownMenuItem(value: 'COMPLETED', child: Text('✔️ Completadas ($completedCount)')),
-                              DropdownMenuItem(value: 'CANCELLED', child: Text('❌ Canceladas ($cancelledCount)')),
+                              DropdownMenuItem(value: 'NO_SHOW', child: Text('❌ No Asistió ($noShowCount)')),
+                              DropdownMenuItem(value: 'CANCELLED', child: Text('🚫 Canceladas ($cancelledCount)')),
                             ],
                             onChanged: (value) {
                               setState(() { filterStatus = value ?? 'all'; });

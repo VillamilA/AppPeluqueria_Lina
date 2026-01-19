@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../core/theme/app_theme.dart';
+import '../../../data/services/token_storage.dart';
+import '../../../services/session_manager.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -91,8 +93,36 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
   
   void _startAnimation() async {
+    // Verificar si hay sesión guardada y válida
+    print('🔍 [SPLASH] Verificando sesión guardada...');
+    
+    try {
+      final isSessionValid = await TokenStorage.instance.isSessionValid();
+      
+      if (isSessionValid) {
+        // Cargar token y usuario
+        final token = await TokenStorage.instance.getAccessToken();
+        if (token != null && mounted) {
+          print('✅ [SPLASH] Sesión válida. Redirigiendo al dashboard...');
+          
+          // Iniciar sesión en el manager
+          SessionManager().startSession();
+          
+          // Redirigir según el rol (por ahora al stylist dashboard, se puede mejorar)
+          Navigator.pushReplacementNamed(context, '/stylist-dashboard');
+          return;
+        }
+      }
+    } catch (e) {
+      print('❌ [SPLASH] Error verificando sesión: $e');
+    }
+    
+    // Si no hay sesión válida, mostrar splash con animación
+    if (!mounted) return;
+    
     // Repetir la animación de corte 3 veces
     for (int i = 0; i < 3; i++) {
+      if (!mounted) return;
       await _scissorController.forward();
       
       // Generar partículas en cada corte

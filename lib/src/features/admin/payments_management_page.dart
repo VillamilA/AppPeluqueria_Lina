@@ -92,17 +92,40 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
         print('✅ ${rawPayments.length} comprobantes cargados');
         print('📦 Estructura de primer pago: ${rawPayments.isNotEmpty ? rawPayments[0].toString() : 'Sin datos'}');
         
+        // ✅ DIAGNÓSTICO: Verificar qué campos tienen los pagos ANTES de enriquecer
+        print('🔍 DIAGNÓSTICO PRE-ENRIQUECIMIENTO:');
+        for (int i = 0; i < (rawPayments.length > 3 ? 3 : rawPayments.length); i++) {
+          final payment = rawPayments[i];
+          print('  Pago[$i]:');
+          print('    - Tiene "amount": ${payment.containsKey("amount")} = ${payment["amount"]}');
+          print('    - Tiene "price": ${payment.containsKey("price")} = ${payment["price"]}');
+          print('    - Tiene "total": ${payment.containsKey("total")} = ${payment["total"]}');
+          print('    - Tiene "bookingId": ${payment.containsKey("bookingId")} = ${payment["bookingId"]}');
+          print('    - Tiene "serviceName": ${payment.containsKey("serviceName")} = ${payment["serviceName"]}');
+          print('    - Tiene "servicePrice": ${payment.containsKey("servicePrice")} = ${payment["servicePrice"]}');
+          print('    - Todas las claves: ${payment.keys.toList()}');
+        }
+        
         // ← ENRIQUECER PAGOS CON DATOS DE RESERVAS
         print('🔄 Iniciando enriquecimiento de pagos...');
         await _enrichPaymentsWithBookingData(rawPayments);
         print('✅ Enriquecimiento completado');
         
-        // Log detallado de amounts después del enriquecimiento
-        print('📊 Montos después de enriquecimiento:');
-        for (int i = 0; i < rawPayments.length && i < 5; i++) {
-          final payment = rawPayments[i];
-          print('  [${i}] ${payment['bookingId']}: amount=${payment['amount']} (${payment['clientName']})');
+        // ✅ DIAGNÓSTICO POST-ENRIQUECIMIENTO
+        print('🔍 DIAGNÓSTICO POST-ENRIQUECIMIENTO:');
+        int amountGreaterThanZero = 0;
+        int amountIsZero = 0;
+        for (int i = 0; i < rawPayments.length; i++) {
+          final amount = rawPayments[i]['amount'] ?? 0.0;
+          if ((amount as num) > 0) {
+            amountGreaterThanZero++;
+            print('  ✅ Pago[$i] ${rawPayments[i]["bookingId"]} tiene monto: $amount');
+          } else {
+            amountIsZero++;
+            print('  ⚠️ Pago[$i] ${rawPayments[i]["bookingId"]} SIGUE SIN MONTO (${rawPayments[i]["clientName"]})');
+          }
         }
+        print('📊 RESUMEN: $amountGreaterThanZero con monto, $amountIsZero sin monto');
         
         if (mounted) {
           setState(() {
@@ -124,105 +147,119 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
   }
 
   /// ← NUEVO MÉTODO: Enriquecer pagos con datos de reservas si falta amount
+  /// ⚠️ CRÍTICO: El endpoint DEBE retornar amount, esto es fallback
   Future<void> _enrichPaymentsWithBookingData(List<Map<String, dynamic>> payments) async {
     int enrichedCount = 0;
     int skippedCount = 0;
-    int errorCount = 0;
+    int failedCount = 0;
     
-    for (var payment in payments) {
+    print('🔄 INICIANDO ENRIQUECIMIENTO DE PAGOS');
+    print('📊 Total de pagos a procesar: ${payments.length}');
+    
+    // Procesar TODOS los pagos, no solo los primeros 10
+    for (int idx = 0; idx < payments.length; idx++) {
+      final payment = payments[idx];
+      final bookingId = payment['bookingId'];
+      
       try {
-        // Si ya tiene amount y es mayor a 0, no hacer nada
+        // ✅ PASO 1: Verificar si YA tiene amount válido
         final currentAmount = payment['amount'];
+        print('📋 [${idx + 1}/${payments.length}] bookingId=$bookingId, amount actual=$currentAmount');
+        
         if (currentAmount != null && currentAmount is num && currentAmount > 0) {
-          print('  ⏭️ [${payment['bookingId']}] Ya tiene amount: $currentAmount');
           skippedCount++;
+          print('   ✅ SKIP - Ya tiene amount válido: $currentAmount');
           continue;
         }
         
-        // Obtener datos de la reserva
-        final bookingId = payment['bookingId'];
+        // ✅ PASO 2: Validar que bookingId existe y es válido
         if (bookingId == null || (bookingId is String && bookingId.isEmpty)) {
-          print('  ⚠️ [${payment['bookingId']}] bookingId nulo o vacío');
-          errorCount++;
+          failedCount++;
+          print('   ❌ FAIL - bookingId inválido');
+          payment['amount'] = 0.0;
           continue;
         }
         
-        print('  🔍 [${bookingId}] Obteniendo datos de reserva...');
+        // ✅ PASO 3: Obtener detalles del booking SINCRONAMENTE
+        print('   🔍 Buscando booking...');
+        final bookingRes = await ApiClient.instance.get(
+          '/api/v1/bookings/$bookingId',
+          headers: {'Authorization': 'Bearer ${widget.token}'},
+        ).timeout(
+          Duration(seconds: 5),
+          onTimeout: () {
+            print('   ⏱️ TIMEOUT al obtener booking');
+            throw Exception('Timeout obteniendo booking');
+          },
+        );
         
-        try {
-          // ← IMPORTANTE: Usar ApiClient con token para hacer la llamada directa
-          final bookingRes = await ApiClient.instance.get(
-            '/api/v1/bookings/$bookingId',
-            token: widget.token,
-          );
-          
-          print('  📊 [${bookingId}] Status: ${bookingRes.statusCode}');
-          
-          if (bookingRes.statusCode == 200) {
-            try {
-              final bookingData = jsonDecode(bookingRes.body);
-              print('  📦 [${bookingId}] Booking data keys: ${bookingData.keys.join(", ")}');
-              
-              // Buscar el precio en varios campos posibles
-              double? price;
-              if (bookingData['precio'] != null) {
-                price = (bookingData['precio'] as num).toDouble();
-                print('  💰 [${bookingId}] Encontrado en "precio": $price');
-              } else if (bookingData['price'] != null) {
-                price = (bookingData['price'] as num).toDouble();
-                print('  💰 [${bookingId}] Encontrado en "price": $price');
-              } else if (bookingData['total'] != null) {
-                price = (bookingData['total'] as num).toDouble();
-                print('  💰 [${bookingId}] Encontrado en "total": $price');
-              } else if (bookingData['monto'] != null) {
-                price = (bookingData['monto'] as num).toDouble();
-                print('  💰 [${bookingId}] Encontrado en "monto": $price');
-              } else if (bookingData['data'] != null && bookingData['data'] is Map) {
-                // A veces la respuesta viene en data
-                final data = bookingData['data'];
-                if (data['precio'] != null) {
-                  price = (data['precio'] as num).toDouble();
-                  print('  💰 [${bookingId}] Encontrado en "data.precio": $price');
-                } else if (data['price'] != null) {
-                  price = (data['price'] as num).toDouble();
-                  print('  💰 [${bookingId}] Encontrado en "data.price": $price');
-                }
-              }
-              
-              if (price != null && price > 0) {
-                payment['amount'] = price;
-                print('  ✅ [${bookingId}] amount=$price (desde booking)');
-                enrichedCount++;
-              } else {
-                print('  ⚠️ [${bookingId}] No encontró precio en booking. Estructura: ${bookingData.toString().length > 200 ? bookingData.toString().substring(0, 200) + '...' : bookingData.toString()}');
-                payment['amount'] = 0.0;
-                errorCount++;
-              }
-            } catch (parseE) {
-              print('  ❌ [${bookingId}] Error parseando JSON: $parseE');
-              print('  📋 Response body: ${bookingRes.body}');
-              payment['amount'] = 0.0;
-              errorCount++;
+        // ✅ PASO 4: Parsear respuesta del booking
+        if (bookingRes.statusCode == 200) {
+          try {
+            final bookingData = jsonDecode(bookingRes.body);
+            print('   📦 Booking encontrado: ${bookingData.toString().substring(0, 100)}...');
+            
+            // ✅ PASO 5: Extraer precio de múltiples campos posibles
+            double? price;
+            
+            // Intento 1: precio (el más común en nuestro sistema)
+            if (bookingData['precio'] != null) {
+              price = (bookingData['precio'] as num).toDouble();
+              print('   💰 Precio encontrado en campo "precio": $price');
+            } 
+            // Intento 2: price (alternativa en inglés)
+            else if (bookingData['price'] != null) {
+              price = (bookingData['price'] as num).toDouble();
+              print('   💰 Precio encontrado en campo "price": $price');
+            } 
+            // Intento 3: total (si se suma)
+            else if (bookingData['total'] != null) {
+              price = (bookingData['total'] as num).toDouble();
+              print('   💰 Precio encontrado en campo "total": $price');
             }
-          } else {
-            print('  ❌ [${bookingId}] Error HTTP ${bookingRes.statusCode} al obtener booking');
-            print('  📋 Response: ${bookingRes.body}');
+            // Intento 4: Buscar en objeto service
+            else if (bookingData['service'] != null && bookingData['service']['precio'] != null) {
+              price = (bookingData['service']['precio'] as num).toDouble();
+              print('   💰 Precio encontrado en service.precio: $price');
+            }
+            
+            // ✅ PASO 6: Validar que el precio es válido
+            if (price != null && price > 0) {
+              payment['amount'] = price;
+              enrichedCount++;
+              print('   ✅ ENRIQUECIDO - Amount actualizado a: $price');
+            } else {
+              failedCount++;
+              payment['amount'] = 0.0;
+              print('   ⚠️  FALLO - Precio no encontrado o es 0 en booking');
+            }
+          } catch (parseError) {
+            failedCount++;
             payment['amount'] = 0.0;
-            errorCount++;
+            print('   ❌ ERROR PARSE - ${parseError.toString()}');
           }
-        } catch (e) {
-          print('  ❌ [${bookingId}] Excepción al obtener booking: $e');
+        } else {
+          failedCount++;
           payment['amount'] = 0.0;
-          errorCount++;
+          print('   ❌ FALLO HTTP - Status: ${bookingRes.statusCode}');
+          print('      Body: ${bookingRes.body.substring(0, 100)}');
         }
       } catch (e) {
-        print('  ❌ Error inesperado en pago: $e');
-        errorCount++;
+        failedCount++;
+        payment['amount'] = 0.0;
+        print('   ❌ EXCEPCIÓN - ${e.toString()}');
       }
     }
     
-    print('📊 Resultados enriquecimiento: $enrichedCount enriquecidos, $skippedCount ya tenían, $errorCount errores');
+    print('✅ ENRIQUECIMIENTO COMPLETADO');
+    print('📊 RESULTADOS: Enriquecidos=$enrichedCount, YaTenían=$skippedCount, Fallidos=$failedCount');
+    final paymentsWithAmount = payments.where((p) {
+      final amount = p['amount'];
+      return amount is num && amount > 0;
+    }).length;
+    print('📊 TOTAL DE PAGOS CON MONTO: $paymentsWithAmount');
   }
+
 
   Future<void> _fetchClients() async {
     try {
@@ -343,13 +380,23 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
   }
 
   Future<void> _confirmPayment(String bookingId) async {
+    // ✅ VALIDACIÓN CRÍTICA: Admin debe revisar comprobante ANTES de confirmar
+    // Según pagoyfactura.md:
+    // 1. Verificar imagen: transferProofUrl (debe ser legible)
+    // 2. Verificar monto: amount debe coincidir con lo transferido
+    // 3. Verificar referencia: transactionRef debe estar en el comprobante
+    // 4. Verificar fecha: debe ser reciente (hoy/ayer máximo)
+    // 5. Verificar banco: debe ser Banco Pichincha
+    
     // Encontrar el pago para obtener el monto y datos
     final payment = payments.firstWhere(
       (p) => p['bookingId'] == bookingId,
       orElse: () => {},
     );
     
-    // Obtener amount de múltiples fuentes posibles
+    // ✅ INTEGRACIÓN PRECIO: Obtener amount de múltiples fuentes
+    // El flujo es: Booking.precio → Payment.amount → Factura.total
+    // Estos DEBEN ser iguales después de que el estilista completa
     double amount = 0.0;
     if (payment['amount'] != null) {
       amount = (payment['amount'] as num).toDouble();
@@ -387,6 +434,7 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Título de confirmación
             Text(
               '¿Confirmar este pago?',
               style: TextStyle(
@@ -394,7 +442,39 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
                 fontSize: 14,
               ),
             ),
+            SizedBox(height: 12),
+            
+            // ✅ CHECKLIST DE VALIDACIÓN (Según pagoyfactura.md)
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📋 Validación antes de confirmar:',
+                    style: TextStyle(
+                      color: const Color(0xFF6B6B6B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  _buildChecklistItem('Imagen legible del comprobante'),
+                  _buildChecklistItem('Monto coincide: \$${amount.toStringAsFixed(2)}'),
+                  _buildChecklistItem('Referencia (RES-...) visible'),
+                  _buildChecklistItem('Banco: Pichincha'),
+                  _buildChecklistItem('Fecha reciente (hoy/ayer)'),
+                ],
+              ),
+            ),
             SizedBox(height: 16),
+            
+            // Datos del pago
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -481,40 +561,71 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
     if (confirmed == true) {
       try {
         setState(() => loading = true);
+        print('🔄 Confirmando pago para booking: $bookingId');
+        
         final res = await _paymentsApi.confirmTransferPayment(
           bookingId: bookingId,
           token: widget.token,
         );
 
+        print('✅ Response status: ${res.statusCode}');
+        print('📦 Response body: ${res.body}');
+
         if (res.statusCode == 200) {
           if (!mounted) return;
+          
+          final responseData = jsonDecode(res.body);
+          final invoiceNumber = responseData['invoiceNumber'] ?? 'N/A';
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Pago confirmado exitosamente'),
+              content: Text('✅ Pago confirmado\nFactura: $invoiceNumber'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
             ),
           );
+          
+          print('⏳ Recargando pagos...');
           await _fetchPayments();
+          print('✅ Pagos recargados');
         } else {
-          final error = jsonDecode(res.body)['message'] ?? 'Error desconocido';
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Error: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          
+          try {
+            final errorData = jsonDecode(res.body);
+            final errorMsg = errorData['message'] ?? errorData['error'] ?? 'Error desconocido';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error: $errorMsg'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error ${res.statusCode}: ${res.body}'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
         }
       } catch (e) {
+        print('❌ Exception: $e');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Error: $e'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
       } finally {
-        if (mounted) setState(() => loading = false);
+        if (mounted) {
+          setState(() => loading = false);
+          print('✅ Loading terminó');
+        }
       }
     }
   }
@@ -747,13 +858,6 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
                         Icons.check_circle,
                         Colors.green,
                       ),
-                      SizedBox(width: 8),
-                      _buildStatChip(
-                        'Por Cobrar',
-                        '\$${pendingAmount.toStringAsFixed(2)}',
-                        Icons.attach_money,
-                        Colors.red,
-                      ),
                     ],
                   ),
                 ),
@@ -797,55 +901,6 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
                       _applyFilter();
                     });
                   },
-                ),
-                SizedBox(height: 12),
-                // Filtro por cliente
-                Row(
-                  children: [
-                    Icon(Icons.filter_list, color: AppColors.gold, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: selectedClientId,
-                        decoration: InputDecoration(
-                          labelText: 'Filtrar por Cliente',
-                          labelStyle: TextStyle(color: AppColors.gray),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.gray),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppColors.gray),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        dropdownColor: AppColors.charcoal,
-                        style: TextStyle(color: Colors.white),
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('Todos los clientes', style: TextStyle(color: AppColors.gray)),
-                          ),
-                          ...clients.map((client) {
-                            return DropdownMenuItem<String>(
-                              value: client['_id'] as String?,
-                              child: Text(
-                                '${client['nombre']} ${client['apellido']}',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            );
-                          }),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            selectedClientId = value;
-                            _applyFilter();
-                          });
-                        },
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -957,16 +1012,23 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
     print('💳 [PAYMENT CARD] Datos completos del payment: $payment');
     
     // Obtener amount de múltiples fuentes posibles
+    // ✅ IMPORTANTE: El backend SIEMPRE debería tener amount > 0
+    // Si no lo tiene, ya fue enriquecido en _enrichPaymentsWithBookingData()
     double amount = 0.0;
-    if (payment['amount'] != null) {
+    String amountSource = 'DESCONOCIDA';
+    
+    if (payment['amount'] != null && (payment['amount'] as num) > 0) {
       amount = (payment['amount'] as num).toDouble();
+      amountSource = 'payment.amount';
     } else if (payment['price'] != null) {
       amount = (payment['price'] as num).toDouble();
+      amountSource = 'payment.price';
     } else if (payment['total'] != null) {
       amount = (payment['total'] as num).toDouble();
+      amountSource = 'payment.total';
     }
     
-    print('💳 [PAYMENT CARD] amount: $amount');
+    print('💳 [PAYMENT CARD] amount: $amount (origen: $amountSource)');
 
     final statusColor = _getStatusColor(paymentStatus);
     final statusLabel = _getStatusLabel(paymentStatus);
@@ -1045,25 +1107,51 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
                     ),
                   ),
                   Spacer(),
-                  // Monto
+                  // Monto - REFERENCIA CLARA DE CUÁNTO DEBE PAGAR
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '\$${amount.toStringAsFixed(2)}',
+                        amount > 0 
+                          ? '\$${amount.toStringAsFixed(2)}'
+                          : '⚠️ SIN MONTO',
                         style: TextStyle(
-                          color: amount > 0 ? AppColors.gold : Colors.orange,
-                          fontSize: 20,
+                          color: amount > 0 ? AppColors.gold : Colors.red,
+                          fontSize: amount > 0 ? 20 : 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (amount == 0.0)
-                        Text(
-                          '(cargando monto...)',
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontSize: 10,
-                            fontStyle: FontStyle.italic,
+                      // Subtítulo descriptivo según estado
+                      if (amount > 0)
+                        Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            paymentStatus == 'PAID' 
+                              ? '✅ Pagado'
+                              : paymentStatus == 'PENDING' 
+                                ? '⏳ A PAGAR'
+                                : paymentStatus.toUpperCase(),
+                            style: TextStyle(
+                              color: paymentStatus == 'PAID' 
+                                ? Colors.green.shade300
+                                : paymentStatus == 'PENDING'
+                                  ? Colors.orange.shade300
+                                  : Colors.grey.shade400,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Error: revisar',
+                            style: TextStyle(
+                              color: Colors.red.shade300,
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ),
                     ],
@@ -1111,16 +1199,17 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
                     Expanded(
                       child: ElevatedButton.icon(
                         icon: Icon(Icons.check_circle, size: 18),
-                        label: Text(amount > 0 ? 'Confirmar' : 'Monto Pendiente'),
+                        label: Text(amount > 0 ? 'Confirmar' : '✅ Confirmar Sin Monto'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: amount > 0 ? Colors.green : Colors.orange.withOpacity(0.7),
+                          backgroundColor: amount > 0 ? Colors.green : Colors.orange,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: amount > 0 ? () => _confirmPayment(bookingId) : null,
+                        // Permitir confirmar incluso sin monto - el backend validará
+                        onPressed: () => _confirmPayment(bookingId),
                       ),
                     ),
                   ],
@@ -1129,6 +1218,26 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// ✅ MÉTODO AUXILIAR: Construcción de item de checklist de validación
+  Widget _buildChecklistItem(String item) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline, size: 14, color: Colors.blue.shade600),
+          SizedBox(width: 8),
+          Text(
+            item,
+            style: TextStyle(
+              color: const Color(0xFF6B6B6B),
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1172,6 +1281,76 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
       return '${client['nombre'] ?? ''} ${client['apellido'] ?? ''}'.trim();
     } catch (e) {
       return clientId;
+    }
+  }
+
+  /// 🎯 OBTENER PRECIO: Busca el monto a pagar desde booking (EN TIEMPO REAL)
+  /// ✅ Intenta 4 fuentes:
+  /// 1. booking.precio (actualizado por estilista)
+  /// 2. booking.price (alternativa en inglés)
+  /// 3. booking.total (si se suma)
+  /// 4. booking.service.precio (fallback de servicio)
+  /// ⚠️ NUNCA usa payment.amount (está guardado como 0.0 en el backend)
+  Future<double> _getRealAmountFromBooking(String bookingId) async {
+    try {
+      if (bookingId.isEmpty) {
+        print('❌ getRealAmount: bookingId vacío');
+        return 0.0;
+      }
+      
+      print('🔍 getRealAmount: Obteniendo precio para booking=$bookingId');
+      
+      final res = await ApiClient.instance.get(
+        '/api/v1/bookings/$bookingId',
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      ).timeout(
+        Duration(seconds: 3),
+        onTimeout: () {
+          print('⏱️ getRealAmount: TIMEOUT');
+          throw Exception('Timeout');
+        },
+      );
+      
+      if (res.statusCode == 200) {
+        final bookingData = jsonDecode(res.body);
+        
+        // Intento 1: precio (más común)
+        if (bookingData['precio'] != null) {
+          final price = (bookingData['precio'] as num).toDouble();
+          print('✅ getRealAmount: Encontrado en precio=$price');
+          return price;
+        }
+        
+        // Intento 2: price
+        if (bookingData['price'] != null) {
+          final price = (bookingData['price'] as num).toDouble();
+          print('✅ getRealAmount: Encontrado en price=$price');
+          return price;
+        }
+        
+        // Intento 3: total
+        if (bookingData['total'] != null) {
+          final price = (bookingData['total'] as num).toDouble();
+          print('✅ getRealAmount: Encontrado en total=$price');
+          return price;
+        }
+        
+        // Intento 4: service.precio
+        if (bookingData['service'] != null && bookingData['service']['precio'] != null) {
+          final price = (bookingData['service']['precio'] as num).toDouble();
+          print('✅ getRealAmount: Encontrado en service.precio=$price');
+          return price;
+        }
+        
+        print('⚠️ getRealAmount: No se encontró precio en booking');
+        return 0.0;
+      } else {
+        print('❌ getRealAmount: HTTP ${res.statusCode}');
+        return 0.0;
+      }
+    } catch (e) {
+      print('❌ getRealAmount: Error - $e');
+      return 0.0;
     }
   }
 }

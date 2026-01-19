@@ -5,6 +5,8 @@ import '../../api/stylists_api.dart';
 import '../../api/slots_api.dart';
 import '../../api/bookings_api.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/notification_service.dart';
+import 'package:intl/intl.dart';
 
 class StylistDetailPage extends StatefulWidget {
   final Map<String, dynamic> stylist;
@@ -32,7 +34,22 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
   @override
   void initState() {
     super.initState();
+    _requestNotificationPermissions();
     _loadStylistDetails();
+  }
+  
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      final notificationService = NotificationService();
+      final hasPermission = await notificationService.requestPermissions();
+      if (hasPermission) {
+        print('✅ [STYLIST_DETAIL] Permisos de notificación otorgados');
+      } else {
+        print('⚠️ [STYLIST_DETAIL] Permisos de notificación denegados');
+      }
+    } catch (e) {
+      print('❌ [STYLIST_DETAIL] Error al solicitar permisos: $e');
+    }
   }
 
   Future<void> _loadStylistDetails() async {
@@ -54,8 +71,9 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
       print('🔍 Stylist ID value: $stylistId');
       
       // Cargar catálogos del estilista
+      // Nota: getStylistCatalogs NO requiere autenticación (endpoint público)
       final catalogsResponse = await StylistsApi(ApiClient.instance)
-          .getStylistCatalogs(stylistId: stylistId, token: widget.token);
+          .getStylistCatalogs(stylistId: stylistId);
       
       if (catalogsResponse.statusCode == 200) {
         final catalogsData = jsonDecode(catalogsResponse.body);
@@ -1052,12 +1070,19 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
                       onPressed: (selectedService == null || selectedSlot == null || isBooking)
                           ? null
                           : () async {
+                              // Obtener el nombre del servicio
+                              final serviceName = availableServices.firstWhere(
+                                (s) => (s['_id'] ?? s['id'] ?? '') == selectedService,
+                                orElse: () => {'nombre': 'Servicio'},
+                              )['nombre'] ?? 'Servicio';
+                              
                               setState(() => isBooking = true);
                               await _createBooking(
                                 ctx,
                                 selectedService!,
                                 selectedSlot!,
                                 stylistName,
+                                serviceName,
                               );
                               setState(() => isBooking = false);
                             },
@@ -1123,6 +1148,7 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
     String serviceId,
     String slotId,
     String stylistName,
+    String serviceName,
   ) async {
     try {
       final bookingsApi = BookingsApi(ApiClient.instance);
@@ -1158,16 +1184,116 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
       final response = await bookingsApi.createBooking(bookingData, token: token);
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ ¡Cita reservada exitosamente!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        Navigator.pop(context);
-        // Opcionalmente, navegar a la página de historial de citas
-        // Navigator.pushNamed(context, '/bookings');
+        final bookingData = jsonDecode(response.body);
+        
+        print('📝 [STYLIST_DETAIL] Respuesta de reserva: $bookingData');
+        
+        // Extraer información
+        final inicio = bookingData['inicio'] ?? selectedSlotData['start'] ?? '';
+        
+        print('👤 [STYLIST_DETAIL] Estilista: $stylistName');
+        print('🕐 [STYLIST_DETAIL] Inicio: $inicio');
+        
+        // Formatear hora
+        String timeDisplay = 'Hora';
+        if (inicio.isNotEmpty) {
+          // Manejar formato ISO (2024-01-18T10:30:00Z) o HH:mm
+          if (inicio.contains('T')) {
+            try {
+              final dateTime = DateTime.parse(inicio);
+              timeDisplay = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+            } catch (e) {
+              print('❌ [STYLIST_DETAIL] Error parsing hora: $e');
+              if (inicio.contains(':')) {
+                timeDisplay = inicio.substring(0, 5);
+              }
+            }
+          } else if (inicio.contains(':')) {
+            timeDisplay = inicio.substring(0, 5);
+          }
+        }
+        
+        print('✅ [STYLIST_DETAIL] Hora formateada: $timeDisplay');
+        
+        // Extraer la fecha de la reserva para la notificación
+        DateTime bookingDate = DateTime.now();
+        if (inicio.isNotEmpty) {
+          try {
+            if (inicio.contains('T')) {
+              bookingDate = DateTime.parse(inicio);
+            }
+          } catch (e) {
+            print('⚠️ [STYLIST_DETAIL] Error parsing fecha: $e, usando hoy');
+          }
+        }
+        
+        // Enviar notificación con la fecha correcta
+        await _sendBookingNotification(serviceName, stylistName, timeDisplay, bookingDate);
+        
+        if (mounted) {
+          // Mostrar diálogo de éxito
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  SizedBox(width: 12),
+                  Text('¡Cita Confirmada!'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  _buildSummaryRowForDialog('Servicio:', serviceName),
+                  const SizedBox(height: 12),
+                  _buildSummaryRowForDialog('Estilista:', stylistName),
+                  const SizedBox(height: 12),
+                  _buildSummaryRowForDialog('Hora:', timeDisplay),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Te recordamos tu cita. Presenta puntualidad.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Cerrar diálogo
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        // Regresar al dashboard (2 pops: página de estilista + página anterior)
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop();
+                      }
+                    });
+                  },
+                  child: const Text('Aceptar'),
+                ),
+              ],
+            ),
+          );
+        }
       } else {
         final errorBody = jsonDecode(response.body);
         final errorMessage = errorBody['message'] ?? 'Error al crear la cita';
@@ -1188,4 +1314,52 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
       );
     }
   }
-}
+
+  Widget _buildSummaryRowForDialog(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _sendBookingNotification(
+    String serviceName,
+    String stylistName,
+    String timeDisplay,
+    DateTime bookingDate,
+  ) async {
+    try {
+      print('📲 Enviando notificación de cita confirmada');
+      final notificationService = NotificationService();
+      
+      // Extraer solo la fecha de la reserva para el mensaje
+      final dateFormat = DateFormat('EEEE, d MMMM', 'es_ES');
+      final dateStr = dateFormat.format(bookingDate);
+      
+      await notificationService.notifyClientBookingCreated(
+        stylistName: stylistName,
+        date: dateStr,
+        time: timeDisplay,
+      );
+      
+      print('✅ Notificación enviada correctamente');
+    } catch (e) {
+      print('❌ Error al enviar notificación: $e');
+}}}

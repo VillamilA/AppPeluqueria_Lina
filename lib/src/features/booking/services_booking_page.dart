@@ -80,9 +80,9 @@ class _ServicesBookingPageState extends State<ServicesBookingPage> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // AppBar con búsqueda
+          // AppBar compacto con búsqueda
           SliverAppBar(
-            expandedHeight: isMobile ? 170 : 185,
+            expandedHeight: isMobile ? 120 : 130,
             pinned: true,
             backgroundColor: AppColors.charcoal,
             surfaceTintColor: Colors.transparent,
@@ -94,46 +94,43 @@ class _ServicesBookingPageState extends State<ServicesBookingPage> {
                 color: AppColors.charcoal,
                 padding: EdgeInsets.symmetric(
                   horizontal: isMobile ? 12 : 16,
-                  vertical: isMobile ? 12 : 16,
+                  vertical: isMobile ? 8 : 12,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Título centrado
+                    // Título compacto
                     Padding(
-                      padding: EdgeInsets.only(
-                        top: isMobile ? 8 : 12,
-                        bottom: isMobile ? 12 : 16,
-                      ),
+                      padding: EdgeInsets.only(bottom: isMobile ? 8 : 10),
                       child: Text(
                         'Servicios',
                         style: TextStyle(
                           color: AppColors.gold,
-                          fontSize: isMobile ? 20 : 24,
+                          fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    // Campo de búsqueda centrado
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 4 : 8,
-                      ),
+                    // Campo de búsqueda compacto
+                    SizedBox(
+                      height: isMobile ? 40 : 44,
                       child: TextField(
                         onChanged: (value) {
                           setState(() => _searchQuery = value);
                         },
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: Colors.white, fontSize: isMobile ? 12 : 13),
                         cursorColor: AppColors.gold,
                         decoration: InputDecoration(
-                          hintText: '🔍 Buscar categoría...',
+                          hintText: '🔍 Buscar...',
                           hintStyle: TextStyle(
                             color: AppColors.gray.withOpacity(0.6),
+                            fontSize: isMobile ? 12 : 13,
                           ),
                           prefixIcon: Icon(
                             Icons.search,
                             color: AppColors.gold,
+                            size: 18,
                           ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? GestureDetector(
@@ -143,33 +140,36 @@ class _ServicesBookingPageState extends State<ServicesBookingPage> {
                                   child: Icon(
                                     Icons.clear,
                                     color: AppColors.gold,
+                                    size: 18,
                                   ),
                                 )
                               : null,
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.08),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 10 : 12,
+                            vertical: isMobile ? 8 : 10,
+                          ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
                               color: AppColors.gold.withOpacity(0.3),
+                              width: 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
-                              color: AppColors.gold.withOpacity(0.3),
+                              color: AppColors.gold.withOpacity(0.2),
+                              width: 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
-                              color: AppColors.gold,
-                              width: 2,
+                              color: AppColors.gold.withOpacity(0.5),
+                              width: 1.5,
                             ),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 12 : 16,
-                            vertical: isMobile ? 11 : 13,
                           ),
                         ),
                       ),
@@ -177,6 +177,10 @@ class _ServicesBookingPageState extends State<ServicesBookingPage> {
                   ],
                 ),
               ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(0),
+              child: SizedBox.shrink(),
             ),
           ),
           // Grid de categorías

@@ -86,8 +86,8 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
 
   List<dynamic> get _filteredBookings {
     return _bookings.where((b) {
-      final status = b['estado'] ?? b['status'] ?? '';
-      return status == _filterStatus;
+      final status = (b['estado'] ?? b['status'] ?? '').toString().toUpperCase();
+      return status == _filterStatus.toUpperCase();
     }).toList();
   }
 
@@ -115,14 +115,61 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
 
   Future<void> _completeBooking(String bookingId) async {
     try {
-      final response = await _api.completeBooking(bookingId, widget.token);
+      // Mostrar diálogo para preguntar si el cliente asistió
+      final clienteAsistio = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            '¿El cliente asistió?',
+            style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppColors.charcoal,
+          content: Text(
+            'Selecciona si el cliente asistió a la cita',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancelar', style: TextStyle(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, false),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+              ),
+              child: Text('❌ No asistió'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+              ),
+              child: Text('✅ Sí asistió'),
+            ),
+          ],
+        ),
+      );
+
+      if (clienteAsistio == null) return; // Usuario canceló
+
+      final response = await _api.completeBooking(
+        bookingId,
+        widget.token,
+        clienteAsistio: clienteAsistio,
+        precio: null,
+      );
       if (response.statusCode == 200) {
+        final statusText = clienteAsistio ? 'Reserva completada' : 'Marcado como no asistió';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reserva completada'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(statusText),
+            backgroundColor: clienteAsistio ? Colors.green : Colors.purple,
+          ),
         );
         await _loadBookings();
-        // Cambiar automáticamente al tab de "Completadas"
-        setState(() => _filterStatus = 'COMPLETED');
+        // Cambiar automáticamente al tab de estado correspondiente
+        setState(() => _filterStatus = clienteAsistio ? 'COMPLETED' : 'NO_SHOW');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al completar'), backgroundColor: Colors.red),
@@ -144,6 +191,7 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
       context: context,
       builder: (context) => CancelBookingDialog(
         bookingInfo: clientName,
+        isStylista: true,
       ),
     );
     
@@ -171,9 +219,11 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
   Color _getStatusColor(String status) {
     final estado = status.toUpperCase();
     switch (estado) {
+      case 'PENDING_STYLIST_CONFIRMATION':
+        return Colors.orange;
       case 'SCHEDULED':
       case 'PENDING':
-        return Colors.orange;
+        return Colors.amber;
       case 'CONFIRMED':
         return Colors.blue;
       case 'COMPLETED':
@@ -191,6 +241,8 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
       case 'SCHEDULED':
       case 'PENDING':
         return 'Pendiente';
+      case 'PENDING_STYLIST_CONFIRMATION':
+        return 'Pendiente de confirmar';
       case 'CONFIRMED':
         return 'Confirmada';
       case 'COMPLETED':
@@ -204,144 +256,243 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Mis Citas',
-            style: TextStyle(
-              color: AppColors.gold,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+    return Scaffold(
+      backgroundColor: AppColors.charcoal,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatusChip('SCHEDULED', 'Pendientes'),
-                SizedBox(width: 8),
-                _buildStatusChip('CONFIRMED', 'Confirmadas'),
-                SizedBox(width: 8),
-                _buildStatusChip('COMPLETED', 'Completadas'),
-                SizedBox(width: 8),
-                _buildStatusChip('CANCELLED', 'Canceladas'),
+                // ═══════════════════════════════════════════
+                // ENCABEZADO CON GRADIENTE
+                // ═══════════════════════════════════════════
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.gold.withOpacity(0.2),
+                        AppColors.gold.withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.gold.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Mis Citas',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: AppColors.gold.withOpacity(0.7), size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            '${_bookings.length} reservas en total',
+                            style: TextStyle(
+                              color: AppColors.gray,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20),
+                
+                // ═══════════════════════════════════════════
+                // FILTROS CON ESTILO MEJORADO
+                // ═══════════════════════════════════════════
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildStatusChip('PENDING_STYLIST_CONFIRMATION', '🔔 Por confirmar', Colors.orange),
+                      SizedBox(width: 10),
+                      _buildStatusChip('SCHEDULED', '⏳ Pendientes', Colors.amber),
+                      SizedBox(width: 10),
+                      _buildStatusChip('CONFIRMED', '✓ Confirmadas', Colors.blue),
+                      SizedBox(width: 10),
+                      _buildStatusChip('COMPLETED', '✓✓ Completadas', Colors.green),
+                      SizedBox(width: 10),
+                      _buildStatusChip('CANCELLED', '✕ Canceladas', Colors.red),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20),
+                
+                // ═══════════════════════════════════════════
+                // CONTENIDO: Citas o Mensaje Vacío
+                // ═══════════════════════════════════════════
+                _loading
+                    ? Center(
+                        child: CircularProgressIndicator(color: AppColors.gold),
+                      )
+                    : _errorMessage.isNotEmpty
+                        ? Container(
+                            padding: EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _errorMessage,
+                              style: TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : _filteredBookings.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 40),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.event_note,
+                                        color: AppColors.gray.withOpacity(0.5),
+                                        size: 48,
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'No hay citas ${_getStatusLabel(_filterStatus).toLowerCase()}',
+                                        style: TextStyle(
+                                          color: AppColors.gray,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: _filteredBookings.length,
+                                shrinkWrap: true,
+                                physics: NeverScrollableScrollPhysics(),
+                                separatorBuilder: (_, __) => SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final booking = _filteredBookings[index];
+                                  
+                                  // Obtener datos del cliente
+                                  final clienteNombre = booking['clienteNombre'] ?? 'Cliente';
+                                  final clienteApellido = booking['clienteApellido'] ?? '';
+                                  final fullClientName = '$clienteNombre $clienteApellido'.trim();
+                                  
+                                  // Obtener nombre del servicio
+                                  final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
+                                  
+                                  // Parsear fechas
+                                  DateTime? fecha;
+                                  try {
+                                    final inicioStr = booking['inicio']?.toString();
+                                    if (inicioStr != null) {
+                                      fecha = DateTime.parse(inicioStr);
+                                    }
+                                  } catch (e) {
+                                    // Fecha inválida
+                                  }
+                                  
+                                  // Obtener horas
+                                  String startTime = '--:--';
+                                  String endTime = '--:--';
+                                  try {
+                                    if (booking['inicio'] != null) {
+                                      final inicio = DateTime.parse(booking['inicio']);
+                                      startTime = '${inicio.hour.toString().padLeft(2, '0')}:${inicio.minute.toString().padLeft(2, '0')}';
+                                    }
+                                    if (booking['fin'] != null) {
+                                      final fin = DateTime.parse(booking['fin']);
+                                      endTime = '${fin.hour.toString().padLeft(2, '0')}:${fin.minute.toString().padLeft(2, '0')}';
+                                    }
+                                  } catch (e) {
+                                    // Horas inválidas
+                                  }
+
+                                  final estado = booking['estado'] ?? booking['status'] ?? 'SCHEDULED';
+                                  final notas = booking['notas'];
+
+                                  return StylistBookingCard(
+                                    clientName: fullClientName,
+                                    serviceName: servicioNombre,
+                                    date: fecha,
+                                    startTime: startTime,
+                                    endTime: endTime,
+                                    status: estado.toUpperCase(),
+                                    statusColor: _getStatusColor(estado),
+                                    statusLabel: _getStatusLabel(estado),
+                                    notes: notas,
+                                    onConfirm: (estado == 'SCHEDULED' || estado == 'PENDING' || estado == 'PENDING_STYLIST_CONFIRMATION')
+                                        ? () => _confirmBooking(booking['_id'])
+                                        : null,
+                                    onComplete: (estado == 'CONFIRMED')
+                                        ? () => _completeBooking(booking['_id'])
+                                        : null,
+                                    onCancel: (estado != 'COMPLETED' && estado != 'CANCELLED')
+                                        ? () => _cancelBooking(booking['_id'])
+                                        : null,
+                                  );
+                                },
+                              ),
               ],
             ),
           ),
-          SizedBox(height: 16),
-          Expanded(
-            child: _loading
-                ? Center(
-                    child: CircularProgressIndicator(color: AppColors.gold),
-                  )
-                : _errorMessage.isNotEmpty
-                    ? Center(
-                        child: Text(
-                          _errorMessage,
-                          style: TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : _filteredBookings.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No hay reservas ${_getStatusLabel(_filterStatus).toLowerCase()}',
-                              style: TextStyle(color: AppColors.gray),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _filteredBookings.length,
-                            separatorBuilder: (_, __) => SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final booking = _filteredBookings[index];
-                              
-                              // Obtener datos del cliente
-                              final clienteNombre = booking['clienteNombre'] ?? 'Cliente';
-                              final clienteApellido = booking['clienteApellido'] ?? '';
-                              final fullClientName = '$clienteNombre $clienteApellido'.trim();
-                              
-                              // Obtener nombre del servicio
-                              final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
-                              
-                              // Parsear fechas
-                              DateTime? fecha;
-                              try {
-                                final inicioStr = booking['inicio']?.toString();
-                                if (inicioStr != null) {
-                                  fecha = DateTime.parse(inicioStr);
-                                }
-                              } catch (e) {
-                                // Fecha inválida
-                              }
-                              
-                              // Obtener horas
-                              String startTime = '--:--';
-                              String endTime = '--:--';
-                              try {
-                                if (booking['inicio'] != null) {
-                                  final inicio = DateTime.parse(booking['inicio']);
-                                  startTime = '${inicio.hour.toString().padLeft(2, '0')}:${inicio.minute.toString().padLeft(2, '0')}';
-                                }
-                                if (booking['fin'] != null) {
-                                  final fin = DateTime.parse(booking['fin']);
-                                  endTime = '${fin.hour.toString().padLeft(2, '0')}:${fin.minute.toString().padLeft(2, '0')}';
-                                }
-                              } catch (e) {
-                                // Horas inválidas
-                              }
-
-                              final estado = booking['estado'] ?? booking['status'] ?? 'SCHEDULED';
-                              final notas = booking['notas'];
-
-                              return StylistBookingCard(
-                                clientName: fullClientName,
-                                serviceName: servicioNombre,
-                                date: fecha,
-                                startTime: startTime,
-                                endTime: endTime,
-                                status: estado.toUpperCase(),
-                                statusColor: _getStatusColor(estado),
-                                statusLabel: _getStatusLabel(estado),
-                                notes: notas,
-                                onConfirm: (estado == 'SCHEDULED' || estado == 'PENDING')
-                                    ? () => _confirmBooking(booking['_id'])
-                                    : null,
-                                onComplete: (estado == 'CONFIRMED')
-                                    ? () => _completeBooking(booking['_id'])
-                                    : null,
-                                onCancel: (estado != 'COMPLETED' && estado != 'CANCELLED')
-                                    ? () => _cancelBooking(booking['_id'])
-                                    : null,
-                              );
-                            },
-                          ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatusChip(String status, String label) {
+  Widget _buildStatusChip(String status, String label, Color color) {
     final isSelected = _filterStatus == status;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() => _filterStatus = status);
-      },
-      backgroundColor: Colors.grey.shade800,
-      selectedColor: _getStatusColor(status).withOpacity(0.3),
-      labelStyle: TextStyle(
-        color: isSelected ? _getStatusColor(status) : AppColors.gray,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
-      side: BorderSide(
-        color: isSelected ? _getStatusColor(status) : Colors.transparent,
-        width: 1.5,
+    return GestureDetector(
+      onTap: () => setState(() => _filterStatus = status),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? color.withOpacity(0.25)
+              : Colors.grey.shade800.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? color : AppColors.gray,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

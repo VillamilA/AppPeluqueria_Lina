@@ -108,7 +108,6 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
         MaterialPageRoute(
           builder: (_) => ResetPasswordPage(
             email: widget.email,
-            code: code,
           ),
         ),
       );

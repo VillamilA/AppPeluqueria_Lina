@@ -140,9 +140,9 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
         final isDesktop = maxWidth >= 900;
         
         // Espaciados adaptativos
-        final horizontalPadding = isSmallPhone ? 12.0 : (isPhone ? 16.0 : (isTablet ? 24.0 : 32.0));
-        final verticalPadding = isSmallPhone ? 16.0 : (isPhone ? 20.0 : 24.0);
-        final sectionSpacing = isSmallPhone ? 20.0 : (isPhone ? 24.0 : (isTablet ? 28.0 : 32.0));
+        final horizontalPadding = isSmallPhone ? 10.0 : (isPhone ? 16.0 : (isTablet ? 24.0 : 32.0));
+        final verticalPadding = isSmallPhone ? 12.0 : (isPhone ? 20.0 : 24.0);
+        final sectionSpacing = isSmallPhone ? 16.0 : (isPhone ? 24.0 : (isTablet ? 28.0 : 32.0));
         
         // Ancho máximo del contenido para centrar
         final contentMaxWidth = isDesktop ? 1200.0 : (isTablet ? 800.0 : double.infinity);
@@ -186,7 +186,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                       _buildRatingsSection(isSmallPhone, isPhone, isTablet),
                       
                       // Espacio final para scroll completo
-                      SizedBox(height: 20),
+                      SizedBox(height: 10),
                     ],
                   ),
                 ),
@@ -201,31 +201,31 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
   // ==================== SECCIÓN BIENVENIDA ====================
   Widget _buildWelcomeSection(bool isSmallPhone, bool isPhone, bool isTablet) {
     final iconSize = isSmallPhone ? 24.0 : (isPhone ? 28.0 : 32.0);
-    final titleSize = isSmallPhone ? 18.0 : (isPhone ? 22.0 : 26.0);
-    final dateSize = isSmallPhone ? 11.0 : (isPhone ? 13.0 : 15.0);
-    final padding = isSmallPhone ? 16.0 : (isPhone ? 20.0 : 24.0);
+    final titleSize = isSmallPhone ? 18.0 : (isPhone ? 24.0 : 28.0);
+    final dateSize = isSmallPhone ? 11.0 : (isPhone ? 14.0 : 16.0);
+    final padding = isSmallPhone ? 12.0 : (isPhone ? 20.0 : 24.0);
     
     return Container(
       padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.grey.shade900,
-            AppColors.charcoal,
-          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            AppColors.charcoal,
+            Colors.grey[900]!,
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.gold.withOpacity(0.3),
+          color: AppColors.gold.withOpacity(0.25),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withOpacity(0.08),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            color: AppColors.gold.withOpacity(0.1),
+            blurRadius: 15,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -235,27 +235,19 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(isSmallPhone ? 10 : 12),
+                padding: EdgeInsets.all(isSmallPhone ? 12 : 14),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.gold, AppColors.gold.withOpacity(0.8)],
-                  ),
+                  color: AppColors.gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.gold.withOpacity(0.25),
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: AppColors.gold.withOpacity(0.3)),
                 ),
                 child: Icon(
-                  Icons.workspace_premium_rounded,
-                  color: Colors.black,
+                  Icons.star_rounded,
+                  color: AppColors.gold,
                   size: iconSize,
                 ),
               ),
-              SizedBox(width: 14),
+              SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,20 +255,20 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                     Text(
                       'Bienvenida',
                       style: TextStyle(
-                        color: AppColors.gray,
-                        fontSize: isSmallPhone ? 11 : 13,
+                        color: Colors.grey[400],
+                        fontSize: isSmallPhone ? 12 : 13,
                         fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.8,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    SizedBox(height: 4),
                     Text(
-                      widget.stylistName,
+                      '${widget.stylistName} ${widget.stylistLastName}',
                       style: TextStyle(
                         color: AppColors.gold,
                         fontSize: titleSize,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -289,14 +281,14 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
           SizedBox(height: 16),
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isSmallPhone ? 10 : 12,
-              vertical: isSmallPhone ? 8 : 10,
+              horizontal: isSmallPhone ? 12 : 14,
+              vertical: isSmallPhone ? 10 : 12,
             ),
             decoration: BoxDecoration(
-              color: AppColors.gold.withOpacity(0.08),
+              color: AppColors.gold.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.gold.withOpacity(0.15),
+                color: AppColors.gold.withOpacity(0.2),
               ),
             ),
             child: Row(
@@ -304,19 +296,20 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                 Icon(
                   Icons.calendar_today_rounded,
                   color: AppColors.gold,
-                  size: isSmallPhone ? 14 : 16,
+                  size: isSmallPhone ? 16 : 18,
                 ),
-                SizedBox(width: 10),
+                SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     DateFormat('EEEE, d \'de\' MMMM \'de\' yyyy', 'es_ES')
                         .format(DateTime.now()),
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withOpacity(0.85),
                       fontSize: dateSize,
                       fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ],
@@ -350,27 +343,41 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
       },
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: isSmallPhone ? 8 : (isPhone ? 10 : 12),
-        mainAxisSpacing: isSmallPhone ? 8 : (isPhone ? 10 : 12),
-        childAspectRatio: isSmallPhone ? 0.95 : (isPhone ? 1.0 : 1.1),
-      ),
-      itemCount: stats.length,
-      itemBuilder: (context, index) {
-        final stat = stats[index];
-        return _buildStatCard(
-          stat['label'] as String,
-          stat['value'] as String,
-          stat['icon'] as IconData,
-          stat['gradient'] as List<Color>,
-          isSmallPhone,
-          isPhone,
-        );
-      },
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            stats[0]['label'] as String,
+            stats[0]['value'] as String,
+            stats[0]['icon'] as IconData,
+            stats[0]['gradient'] as List<Color>,
+            isSmallPhone,
+            isPhone,
+          ),
+        ),
+        SizedBox(width: isSmallPhone ? 6 : (isPhone ? 8 : 10)),
+        Expanded(
+          child: _buildStatCard(
+            stats[1]['label'] as String,
+            stats[1]['value'] as String,
+            stats[1]['icon'] as IconData,
+            stats[1]['gradient'] as List<Color>,
+            isSmallPhone,
+            isPhone,
+          ),
+        ),
+        SizedBox(width: isSmallPhone ? 6 : (isPhone ? 8 : 10)),
+        Expanded(
+          child: _buildStatCard(
+            stats[2]['label'] as String,
+            stats[2]['value'] as String,
+            stats[2]['icon'] as IconData,
+            stats[2]['gradient'] as List<Color>,
+            isSmallPhone,
+            isPhone,
+          ),
+        ),
+      ],
     );
   }
 
@@ -382,52 +389,61 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
     bool isSmallPhone,
     bool isPhone,
   ) {
-    final iconSize = isSmallPhone ? 18.0 : (isPhone ? 20.0 : 24.0);
-    final valueSize = isSmallPhone ? 18.0 : (isPhone ? 20.0 : 24.0);
-    final labelSize = isSmallPhone ? 9.5 : (isPhone ? 10.5 : 12.0);
-    final padding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
+    final iconSize = isSmallPhone ? 16.0 : (isPhone ? 20.0 : 24.0);
+    final valueSize = isSmallPhone ? 16.0 : (isPhone ? 20.0 : 24.0);
+    final labelSize = isSmallPhone ? 9.0 : (isPhone ? 11.0 : 12.0);
+    final padding = isSmallPhone ? 8.0 : (isPhone ? 10.0 : 12.0);
     
     return Container(
       padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.grey.shade900,
-            Colors.grey.shade800,
-          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            gradientColors[0].withOpacity(0.08),
+            gradientColors[1].withOpacity(0.04),
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: gradientColors[0].withOpacity(0.25),
-          width: 1.2,
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: gradientColors[0].withOpacity(0.12),
-            blurRadius: 10,
+            color: gradientColors[0].withOpacity(0.08),
+            blurRadius: 12,
             offset: Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.all(isSmallPhone ? 8 : (isPhone ? 10 : 12)),
+            padding: EdgeInsets.all(isSmallPhone ? 8 : (isPhone ? 9 : 11)),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: gradientColors),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gradientColors,
+              ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: gradientColors[0].withOpacity(0.35),
-                  blurRadius: 10,
-                  offset: Offset(0, 3),
+                  color: gradientColors[0].withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: iconSize),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: iconSize,
+            ),
           ),
           SizedBox(height: isSmallPhone ? 6 : 8),
           Text(
@@ -435,21 +451,24 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
             style: TextStyle(
               color: Colors.white,
               fontSize: valueSize,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.3,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
-              color: AppColors.gray,
+              color: Colors.grey[400],
               fontSize: labelSize,
               fontWeight: FontWeight.w500,
+              letterSpacing: 0.3,
             ),
-            textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -458,10 +477,10 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
 
   // ==================== BOTÓN GESTIONAR CITAS ====================
   Widget _buildManageBookingsButton(bool isSmallPhone, bool isPhone, bool isTablet) {
-    final padding = isSmallPhone ? 14.0 : (isPhone ? 16.0 : 18.0);
-    final iconSize = isSmallPhone ? 20.0 : (isPhone ? 24.0 : 26.0);
-    final titleSize = isSmallPhone ? 14.0 : (isPhone ? 15.0 : 17.0);
-    final subtitleSize = isSmallPhone ? 10.0 : (isPhone ? 11.0 : 13.0);
+    final padding = isSmallPhone ? 12.0 : (isPhone ? 16.0 : 18.0);
+    final iconSize = isSmallPhone ? 18.0 : (isPhone ? 24.0 : 26.0);
+    final titleSize = isSmallPhone ? 13.0 : (isPhone ? 15.0 : 17.0);
+    final subtitleSize = isSmallPhone ? 9.0 : (isPhone ? 11.0 : 13.0);
     
     return Material(
       color: Colors.transparent,
@@ -548,15 +567,15 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
 
   // ==================== CITAS DEL DÍA ====================
   Widget _buildTodaySection(bool isSmallPhone, bool isPhone, bool isTablet) {
-    final headerPadding = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 16.0);
-    final titleSize = isSmallPhone ? 16.0 : (isPhone ? 18.0 : 20.0);
-    final badgeSize = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 15.0);
+    final headerPadding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
+    final titleSize = isSmallPhone ? 14.0 : (isPhone ? 16.0 : 18.0);
+    final badgeSize = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: EdgeInsets.all(headerPadding),
+          padding: EdgeInsets.symmetric(horizontal: headerPadding, vertical: headerPadding * 0.75),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -564,7 +583,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                 Color(0xFF1976D2).withOpacity(0.08),
               ],
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Color(0xFF2196F3).withOpacity(0.25),
             ),
@@ -572,33 +591,39 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.wb_sunny_rounded,
-                    color: Color(0xFF64B5F6),
-                    size: isSmallPhone ? 18 : 20,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Citas de Hoy',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: titleSize,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.wb_sunny_rounded,
+                      color: Color(0xFF64B5F6),
+                      size: isSmallPhone ? 16 : 18,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Citas de Hoy',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              SizedBox(width: 8),
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isSmallPhone ? 10 : 12,
-                  vertical: isSmallPhone ? 4 : 6,
+                  horizontal: isSmallPhone ? 8 : 10,
+                  vertical: isSmallPhone ? 3 : 4,
                 ),
                 decoration: BoxDecoration(
                   color: Color(0xFF2196F3).withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   '${_todayBookings.length}',
@@ -612,7 +637,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
             ],
           ),
         ),
-        SizedBox(height: 14),
+        SizedBox(height: 12),
         _todayBookings.isEmpty
             ? _buildEmptyState(
                 'No hay citas para hoy',
@@ -636,15 +661,15 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
 
   // ==================== AGENDA SEMANAL ====================
   Widget _buildWeeklySection(bool isSmallPhone, bool isPhone, bool isTablet) {
-    final headerPadding = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 16.0);
-    final titleSize = isSmallPhone ? 16.0 : (isPhone ? 18.0 : 20.0);
-    final badgeSize = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 15.0);
+    final headerPadding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
+    final titleSize = isSmallPhone ? 14.0 : (isPhone ? 16.0 : 18.0);
+    final badgeSize = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: EdgeInsets.all(headerPadding),
+          padding: EdgeInsets.symmetric(horizontal: headerPadding, vertical: headerPadding * 0.75),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -652,7 +677,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                 Color(0xFF7B1FA2).withOpacity(0.08),
               ],
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Color(0xFF9C27B0).withOpacity(0.25),
             ),
@@ -660,33 +685,39 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.view_week_rounded,
-                    color: Color(0xFFBA68C8),
-                    size: isSmallPhone ? 18 : 20,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Esta Semana',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: titleSize,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.view_week_rounded,
+                      color: Color(0xFFBA68C8),
+                      size: isSmallPhone ? 16 : 18,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Esta Semana',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              SizedBox(width: 8),
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isSmallPhone ? 10 : 12,
-                  vertical: isSmallPhone ? 4 : 6,
+                  horizontal: isSmallPhone ? 8 : 10,
+                  vertical: isSmallPhone ? 3 : 4,
                 ),
                 decoration: BoxDecoration(
                   color: Color(0xFF9C27B0).withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   '${_weekBookings.length}',
@@ -700,7 +731,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
             ],
           ),
         ),
-        SizedBox(height: 14),
+        SizedBox(height: 12),
         _weekBookings.isEmpty
             ? _buildEmptyState(
                 'No hay citas esta semana',
@@ -753,7 +784,13 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
       'icon': Icons.schedule_rounded,
     };
     
-    if (estado == 'CONFIRMED') {
+    if (estado == 'PENDING_STYLIST_CONFIRMATION') {
+      statusInfo = {
+        'color': Color(0xFFFFB74D),
+        'label': 'Pendiente aprobación',
+        'icon': Icons.pending_actions_rounded,
+      };
+    } else if (estado == 'CONFIRMED') {
       statusInfo = {
         'color': Color(0xFF2196F3),
         'label': 'Confirmada',
@@ -773,7 +810,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
       };
     }
     
-    final padding = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 16.0);
+    final padding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
     final nameSize = isSmallPhone ? 13.0 : (isPhone ? 14.0 : 15.0);
     final serviceSize = isSmallPhone ? 10.0 : (isPhone ? 11.0 : 12.0);
     final statusSize = isSmallPhone ? 9.0 : (isPhone ? 10.0 : 11.0);
@@ -782,26 +819,12 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
     return Container(
       padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.grey.shade900,
-            Colors.grey.shade800,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: (statusInfo['color'] as Color).withOpacity(0.25),
-          width: 1.2,
+          color: (statusInfo['color'] as Color).withOpacity(0.2),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: (statusInfo['color'] as Color).withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,14 +835,12 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
               Container(
                 padding: EdgeInsets.all(isSmallPhone ? 8 : 10),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.gold, AppColors.gold.withOpacity(0.85)],
-                  ),
+                  color: AppColors.gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Icons.person_rounded,
-                  color: Colors.black,
+                  color: AppColors.gold,
                   size: isSmallPhone ? 16 : 18,
                 ),
               ),
@@ -1009,15 +1030,15 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
 
   // ==================== CALIFICACIONES ====================
   Widget _buildRatingsSection(bool isSmallPhone, bool isPhone, bool isTablet) {
-    final headerPadding = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 16.0);
-    final titleSize = isSmallPhone ? 16.0 : (isPhone ? 18.0 : 20.0);
-    final badgeSize = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 15.0);
+    final headerPadding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
+    final titleSize = isSmallPhone ? 14.0 : (isPhone ? 16.0 : 18.0);
+    final badgeSize = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: EdgeInsets.all(headerPadding),
+          padding: EdgeInsets.symmetric(horizontal: headerPadding, vertical: headerPadding * 0.75),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -1025,7 +1046,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                 Color(0xFFF57C00).withOpacity(0.08),
               ],
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Color(0xFFFFA726).withOpacity(0.25),
             ),
@@ -1033,33 +1054,39 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.emoji_events_rounded,
-                    color: Color(0xFFFFB74D),
-                    size: isSmallPhone ? 18 : 20,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Calificaciones',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: titleSize,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.emoji_events_rounded,
+                      color: Color(0xFFFFB74D),
+                      size: isSmallPhone ? 16 : 18,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Calificaciones',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              SizedBox(width: 8),
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isSmallPhone ? 10 : 12,
-                  vertical: isSmallPhone ? 4 : 6,
+                  horizontal: isSmallPhone ? 8 : 10,
+                  vertical: isSmallPhone ? 3 : 4,
                 ),
                 decoration: BoxDecoration(
                   color: Color(0xFFFFA726).withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   '${_ratings.length}',
@@ -1073,7 +1100,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
             ],
           ),
         ),
-        SizedBox(height: 14),
+        SizedBox(height: 12),
         _ratings.isEmpty
             ? _buildEmptyState(
                 'No tienes calificaciones',
@@ -1219,7 +1246,7 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
     final estrellas = rating['estrellas'] ?? 0;
     final comentario = rating['comentario'] ?? '';
     
-    final padding = isSmallPhone ? 12.0 : (isPhone ? 14.0 : 16.0);
+    final padding = isSmallPhone ? 10.0 : (isPhone ? 12.0 : 14.0);
     final nameSize = isSmallPhone ? 12.0 : (isPhone ? 13.0 : 14.0);
     final serviceSize = isSmallPhone ? 10.0 : (isPhone ? 11.0 : 12.0);
     final starSize = isSmallPhone ? 14.0 : (isPhone ? 15.0 : 16.0);
@@ -1277,14 +1304,19 @@ class _StylistHomeTabState extends State<StylistHomeTab> {
                   ],
                 ),
               ),
-              Row(
-                children: List.generate(5, (i) {
-                  return Icon(
-                    i < estrellas ? Icons.star_rounded : Icons.star_border_rounded,
-                    color: i < estrellas ? Color(0xFFFFA726) : Colors.grey.shade700,
-                    size: starSize,
-                  );
-                }),
+              SizedBox(width: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(5, (i) {
+                    return Icon(
+                      i < estrellas ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: i < estrellas ? Color(0xFFFFA726) : Colors.grey.shade700,
+                      size: starSize,
+                    );
+                  }),
+                ),
               ),
             ],
           ),

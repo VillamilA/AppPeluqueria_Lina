@@ -3,6 +3,7 @@ import 'package:peluqueria_lina_app/src/core/theme/app_theme.dart';
 import '../reports/reports_dashboard_page.dart';
 import '../profile/pages/profile_page.dart';
 import '../admin/payments_management_page.dart';
+import '../admin/manage_users_page.dart';
 import '../../data/services/token_storage.dart';
 
 class _HomeCardModel {
@@ -494,6 +495,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         color: Color(0xFFD4AF37), // Oro oscuro
       ),
       _AdminGridCard(
+        icon: Icons.group_rounded,
+        title: 'Activación de Usuarios',
+        subtitle: 'Habilita / Deshabilita los usuarios',
+        route: '/admin/manage-users',
+        color: AppColors.gold,
+      ),
+      _AdminGridCard(
         icon: Icons.design_services_rounded,
         title: 'Servicios',
         subtitle: 'Gestiona servicios',
@@ -676,6 +684,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             context,
             MaterialPageRoute(
               builder: (context) => ReportsDashboardPage(
+                token: token,
+                userRole: 'ADMIN',
+              ),
+            ),
+          );
+        } else if (card.route == '/admin/manage-users') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ManageUsersPage(
                 token: token,
                 userRole: 'ADMIN',
               ),

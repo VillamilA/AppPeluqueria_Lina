@@ -58,12 +58,13 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
   Future<void> fetchSlots() async {
     if (stylistId == null || widget.serviceId.isEmpty || selectedDate == null) return;
     
-    print('📍 Fetching slots: service=${widget.serviceId}, date=$selectedDate');
+    print('📍 Fetching slots: service=${widget.serviceId}, stylist=$stylistId, date=$selectedDate');
     
     final dateString = "${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
     
     final res = await BookingsApi(ApiClient.instance).getSlots(
       serviceId: widget.serviceId,
+      stylistId: stylistId!,
       date: dateString,
     );
     

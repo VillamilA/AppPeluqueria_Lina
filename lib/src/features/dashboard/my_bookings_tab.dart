@@ -11,7 +11,9 @@ import '../../api/bookings_api.dart';
 import '../../widgets/cancel_booking_dialog.dart';
 import '../../core/theme/app_theme.dart';
 import '../booking/rating_dialog.dart';
+import '../booking/reschedule_booking_dialog.dart';
 import '../common/dialogs/app_dialogs.dart';
+import '../../services/bookings_enrichment_service.dart';
 
 class MyBookingsTab extends StatefulWidget {
   final String token;
@@ -23,8 +25,14 @@ class MyBookingsTab extends StatefulWidget {
 
 class _MyBookingsTabState extends State<MyBookingsTab> {
   List<dynamic> bookings = [];
+  List<dynamic> filteredBookings = [];
   bool isLoading = true;
   String errorMessage = '';
+  
+  // Filtros
+  String filterStatus = 'ALL'; // ALL, SCHEDULED, CONFIRMED, COMPLETED, NO_SHOW, CANCELLED
+  String filterPayment = 'ALL'; // ALL, PAID, UNPAID
+  String filterSortBy = 'RECENT'; // RECENT, OLDEST
 
   @override
   void initState() {
@@ -44,11 +52,21 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final rawBookings = data is List ? data : data['data'] ?? [];
+        
+        // Enriquecer datos con información de estilista y servicio
+        print('[MY_BOOKINGS] Enriqueciendo ${rawBookings.length} citas...');
+        final enrichmentService = BookingsEnrichmentService(token: widget.token);
+        final enrichedBookings = await enrichmentService.enrichBookings(rawBookings);
+        
         setState(() {
-          bookings = data is List ? data : data['data'] ?? [];
+          bookings = enrichedBookings;
+          _applyFilters();
           isLoading = false;
           errorMessage = '';
         });
+        
+        print('[MY_BOOKINGS] ✅ Cache: ${enrichmentService.getCacheStats()}');
       } else if (response.statusCode == 401) {
         setState(() {
           errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
@@ -92,6 +110,52 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     }
   }
 
+  void _applyFilters() {
+    List<dynamic> filtered = bookings;
+
+    // Filtro por estado
+    if (filterStatus != 'ALL') {
+      filtered = filtered.where((booking) {
+        return (booking['estado'] ?? 'SCHEDULED').toUpperCase() == filterStatus;
+      }).toList();
+    }
+
+    // Filtro por estado de pago
+    if (filterPayment != 'ALL') {
+      filtered = filtered.where((booking) {
+        final paymentStatus = (booking['paymentStatus'] ?? 'UNPAID').toUpperCase();
+        return paymentStatus == filterPayment;
+      }).toList();
+    }
+
+    // Ordenamiento por antigüedad
+    if (filterSortBy == 'RECENT') {
+      filtered.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['inicio'] ?? '');
+          final dateB = DateTime.parse(b['inicio'] ?? '');
+          return dateB.compareTo(dateA); // Más recientes primero
+        } catch (e) {
+          return 0;
+        }
+      });
+    } else if (filterSortBy == 'OLDEST') {
+      filtered.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['inicio'] ?? '');
+          final dateB = DateTime.parse(b['inicio'] ?? '');
+          return dateA.compareTo(dateB); // Más antiguos primero
+        } catch (e) {
+          return 0;
+        }
+      });
+    }
+
+    setState(() {
+      filteredBookings = filtered;
+    });
+  }
+
   String _getStatusLabel(String? status) {
     switch (status?.toUpperCase()) {
       case 'SCHEDULED':
@@ -100,10 +164,10 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         return 'Reservada';
       case 'COMPLETED':
         return 'Completada';
+      case 'NO_SHOW':
+        return '❌ No Asististe';
       case 'CANCELLED':
         return 'Cancelada';
-      case 'PENDING':
-        return 'Pendiente';
       case 'PENDING_STYLIST_CONFIRMATION':
         return 'Pendiente aprobación';
       default:
@@ -119,6 +183,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         return AppColors.gold;
       case 'COMPLETED':
         return Colors.green;
+      case 'NO_SHOW':
+        return Colors.purple;
       case 'CANCELLED':
         return Colors.red;
       case 'PENDING_STYLIST_CONFIRMATION':
@@ -156,6 +222,48 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       default:
         return AppColors.gray;
     }
+  }
+
+  /// Construye un filtro compacto y responsive
+  Widget _buildCompactFilter(
+    String label,
+    String currentValue,
+    List<String> values,
+    List<String> labels,
+    List<Color> colors,
+    Function(String) onChanged,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.gold.withOpacity(0.25)),
+        borderRadius: BorderRadius.circular(6),
+        color: AppColors.charcoal.withOpacity(0.6),
+      ),
+      child: DropdownButton<String>(
+        value: currentValue,
+        underline: SizedBox(),
+        isDense: true,
+        dropdownColor: AppColors.charcoal,
+        style: TextStyle(color: Colors.white, fontSize: 10),
+        items: List.generate(values.length, (i) {
+          return DropdownMenuItem(
+            value: values[i],
+            child: Text(
+              labels[i],
+              style: TextStyle(
+                color: colors[i],
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          );
+        }),
+        onChanged: (value) {
+          if (value != null) onChanged(value);
+        },
+      ),
+    );
   }
 
   @override
@@ -231,18 +339,110 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   : RefreshIndicator(
                       onRefresh: _fetchMyBookings,
                       color: AppColors.gold,
-                      child: ListView.separated(
-                        padding: EdgeInsets.all(16),
-                        itemCount: bookings.length,
-                        separatorBuilder: (_, __) => SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final booking = bookings[index];
-                          final status = booking['estado'] ?? 'SCHEDULED';
-                          final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
-                          final estilistaNombre = '${booking['estilistaNombre'] ?? ''} ${booking['estilistaApellido'] ?? ''}';
-                          final inicio = booking['inicio'];
-                          final fin = booking['fin'];
-                          final paymentStatus = booking['paymentStatus'] ?? 'UNPAID';
+                      child: Column(
+                        children: [
+                          // FILTROS - UNA SOLA LÍNEA
+                          Container(
+                            color: Colors.black26,
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            child: Row(
+                              children: [
+                                // Estado
+                                Expanded(
+                                  child: _buildCompactFilter(
+                                    'Estado',
+                                    filterStatus,
+                                    ['ALL', 'SCHEDULED', 'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'],
+                                    ['Todas', 'Programadas', 'Reservadas', 'Completadas', '❌ No Asistí', 'Canceladas'],
+                                    [Colors.white, Colors.orange, AppColors.gold, Colors.green, Colors.purple, Colors.red],
+                                    (value) {
+                                      setState(() {
+                                        filterStatus = value;
+                                        _applyFilters();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                
+                                // Pago
+                                Expanded(
+                                  child: _buildCompactFilter(
+                                    'Pago',
+                                    filterPayment,
+                                    ['ALL', 'PAID', 'UNPAID'],
+                                    ['Todos', 'Pagadas', 'No pagadas'],
+                                    [Colors.white, Colors.green, Colors.red],
+                                    (value) {
+                                      setState(() {
+                                        filterPayment = value;
+                                        _applyFilters();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                
+                                // Antigüedad
+                                Expanded(
+                                  child: _buildCompactFilter(
+                                    'Orden',
+                                    filterSortBy,
+                                    ['RECENT', 'OLDEST'],
+                                    ['Recientes', 'Antiguos'],
+                                    [Colors.white, Colors.white],
+                                    (value) {
+                                      setState(() {
+                                        filterSortBy = value;
+                                        _applyFilters();
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // LISTA
+                          Expanded(
+                            child: filteredBookings.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No hay citas con estos filtros',
+                                      style: TextStyle(
+                                        color: AppColors.gray,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    padding: EdgeInsets.all(16),
+                                    itemCount: filteredBookings.length,
+                                    separatorBuilder: (_, __) =>
+                                        SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final booking = filteredBookings[index];
+                                      final status =
+                                          booking['estado'] ?? 'SCHEDULED';
+
+                                      // Obtener datos enriquecidos (con fallback a datos crudos)
+                                      final servicioNombre =
+                                          booking['service']?['nombre'] ??
+                                              booking['servicioNombre'] ??
+                                              'Servicio';
+                                      final estilistaNombre =
+                                          booking['stylist']
+                                                      ?['nombre'] !=
+                                                  null
+                                              ? '${booking['stylist']['nombre']} ${booking['stylist']['apellido'] ?? ''}'
+                                                  .trim()
+                                              : '${booking['estilistaNombre'] ?? ''} ${booking['estilistaApellido'] ?? ''}'
+                                                  .trim();
+
+                                      final inicio = booking['inicio'];
+                                      final fin = booking['fin'];
+                                      final paymentStatus =
+                                          booking['paymentStatus'] ??
+                                              'UNPAID';
                           final precio = booking['precio'];
                           final invoiceNumber = booking['invoiceNumber'];
                           
@@ -274,6 +474,14 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                                 color: AppColors.gold,
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              'Con: $estilistaNombre',
+                                              style: TextStyle(
+                                                color: AppColors.gray,
+                                                fontSize: 12,
                                               ),
                                             ),
                                             SizedBox(height: 4),
@@ -501,6 +709,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                           );
                         },
                       ),
+                          ),
+                        ],
+                      ),
                     ),
     );
   }
@@ -534,6 +745,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       context: context,
       builder: (ctx) => CancelBookingDialog(
         bookingInfo: bookingInfo,
+        isStylista: false,
       ),
     );
 
@@ -613,29 +825,16 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   }
 
   void _showRescheduleDialog(dynamic booking) {
-    final servicioNombre = booking['servicioNombre'] ?? 'Servicio';
-    final inicio = booking['inicio'];
-    
-    // Calcular horas restantes
-    int horasRestantes = 0;
-    try {
-      if (inicio != null) {
-        final fechaCita = DateTime.parse(inicio.toString());
-        final ahora = DateTime.now();
-        horasRestantes = fechaCita.difference(ahora).inHours;
-      }
-    } catch (e) {
-      print('Error calculando horas restantes: $e');
-    }
-
-    final bool puedesReprogramar = horasRestantes >= 12;
-    final String message = '$servicioNombre\n\n${puedesReprogramar ? 'Puedes reprogramar sin restricciones. Faltan $horasRestantes horas.' : 'Tu cuenta será congelada por 24 horas si reprogramas ahora.'}\n\nPor favor, contacta con nosotros:\n+1-234-567-8900\npeluqueria@lina.com';
-
-    AppDialogHelper.showInfo(
-      context,
-      title: '¿Reprogramar esta cita?',
-      message: message,
-      buttonText: 'Cerrar',
+    showDialog(
+      context: context,
+      builder: (context) => RescheduleBookingDialog(
+        booking: booking,
+        token: widget.token,
+        onSuccess: (updatedBooking) {
+          // Actualizar la lista de citas
+          _fetchMyBookings();
+        },
+      ),
     );
   }
 

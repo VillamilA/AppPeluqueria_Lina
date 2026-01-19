@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
+import 'package:flutter/services.dart';
 import '../../api/reports_api.dart';
 import '../models/report_models.dart';
 
@@ -166,15 +166,12 @@ class ReportsService {
     }
   }
 
-  /// Abre el archivo PDF guardado
+  /// Abre el archivo PDF guardado en Android
   Future<void> openPdfFile(String filePath) async {
     try {
-      final result = await OpenFile.open(filePath);
-      print('[REPORTS_SERVICE] Resultado de abrir PDF: ${result.message}');
-      
-      if (result.type != ResultType.done) {
-        throw Exception('No se pudo abrir el archivo: ${result.message}');
-      }
+      const platform = MethodChannel('com.peluquerialina.app/pdf');
+      await platform.invokeMethod('openPdf', {'filePath': filePath});
+      print('[REPORTS_SERVICE] PDF abierto correctamente: $filePath');
     } catch (e) {
       print('[REPORTS_SERVICE] Error al abrir PDF: $e');
       throw Exception('Error al abrir el archivo PDF: $e');

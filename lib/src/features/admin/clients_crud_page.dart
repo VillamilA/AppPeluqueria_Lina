@@ -289,6 +289,7 @@ class _ClientsCrudPageState extends State<ClientsCrudPage> {
         title: Text('Gestión de Clientes', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.charcoal,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.gold),
       ),
       body: Column(
         children: [

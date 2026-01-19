@@ -48,7 +48,7 @@ dependencies:
   geolocator: ^11.0.0
   fl_chart: ^0.65.0
   path_provider: ^2.1.1
-  open_file: ^3.3.2
+  package_info_plus: ^6.0.0
   flutter_rating_bar: ^4.0.1
   provider: ^6.1.5+1
 
@@ -63,6 +63,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

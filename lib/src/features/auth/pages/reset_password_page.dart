@@ -7,12 +7,10 @@ import '../widgets/auth_message_dialog.dart';
 /// Página para restablecer contraseña con código de recuperación
 class ResetPasswordPage extends StatefulWidget {
   final String email;
-  final String code; // Código ya verificado
 
   const ResetPasswordPage({
     super.key,
     required this.email,
-    required this.code,
   });
 
   @override
@@ -21,14 +19,17 @@ class ResetPasswordPage extends StatefulWidget {
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
+  final _codeCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _loading = false;
+  String? _codeError; // Para mostrar error del código
 
   @override
   void dispose() {
+    _codeCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -41,12 +42,20 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       'uppercase': RegExp(r'[A-Z]').hasMatch(password),
       'lowercase': RegExp(r'[a-z]').hasMatch(password),
       'number': RegExp(r'\d').hasMatch(password),
+      'special': RegExp(r'[^a-zA-Z0-9\s]').hasMatch(password), // ✅ CARÁCTER ESPECIAL (cualquier símbolo)
     };
   }
 
   /// Restablece la contraseña
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ✅ VALIDAR EL CÓDIGO (no puede estar vacío)
+    final code = _codeCtrl.text.trim();
+    if (code.isEmpty) {
+      setState(() => _codeError = 'Ingresa el código de recuperación');
+      return;
+    }
 
     final newPassword = _passwordCtrl.text;
 
@@ -76,7 +85,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Actualizando contraseña...',
+                    'Verificando código y actualizando contraseña...',
                     style: TextStyle(
                       color: AppColors.gold,
                       fontSize: 16,
@@ -92,9 +101,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     }
 
     try {
+      // ✅ LLAMAR AL API CON EL CÓDIGO INGRESADO
       await AuthService.resetPassword(
         widget.email,
-        widget.code,
+        code,
         newPassword,
       );
 
@@ -125,28 +135,49 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       // Cerrar loading
       Navigator.of(context).pop();
 
-      String message = 'Error al restablecer la contraseña';
+      String errorMsg = e.toString();
 
-      if (e.toString().contains('Código expirado')) {
-        message = 'El código ha expirado. Solicita uno nuevo.';
-      } else if (e.toString().contains('Código incorrecto')) {
-        message = 'El código ingresado es incorrecto';
-      } else if (e.toString().contains('contraseña debe')) {
-        message = 'La contraseña no cumple los requisitos de seguridad';
-      } else if (e.toString().contains('connection')) {
-        message = 'Error de conexión. Verifica tu internet.';
+      // ✅ DIFERENCIAR ERRORES DE CÓDIGO
+      if (errorMsg.contains('expirado')) {
+        setState(() => _codeError = '❌ Código expirado. Solicita uno nuevo.');
+        // Mostrar alerta prominente
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.error,
+          title: 'Código Expirado',
+          message: 'El código de recuperación ha expirado. Solicita uno nuevo en "¿Olvidaste tu contraseña?"',
+          seconds: 4,
+        );
+      } else if (errorMsg.contains('incorrecto')) {
+        setState(() => _codeError = '❌ Código incorrecto. Verifica y intenta de nuevo.');
+        // Mostrar alerta prominente para código incorrecto
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.error,
+          title: 'Código Incorrecto',
+          message: 'El código de recuperación ingresado es incorrecto.\n\nVerifica el código en tu correo y copia exactamente lo que ves.',
+          seconds: 4,
+        );
+      } else if (errorMsg.contains('contraseña')) {
+        // Error de validación de contraseña
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.error,
+          title: 'Contraseña Inválida',
+          message: 'La contraseña no cumple los requisitos. Verifica los criterios.',
+          seconds: 4,
+        );
+      } else {
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.error,
+          title: 'Error',
+          message: errorMsg.replaceFirst('Exception: ', ''),
+          seconds: 3,
+        );
       }
-
-      AuthMessageDialog.show(
-        context,
-        type: MessageType.error,
-        title: 'Error',
-        message: message,
-      );
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      setState(() => _loading = false);
     }
   }
 
@@ -215,7 +246,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Email
+                    // Email mostrado
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -228,14 +259,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.check_circle,
+                            Icons.email,
                             size: 20,
                             color: AppColors.gold,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Código verificado para: ${widget.email}',
+                              'Para: ${widget.email}',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.gray,
@@ -246,7 +277,49 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
+
+                    // ✅ CAMPO CÓDIGO DE RECUPERACIÓN
+                    TextFormField(
+                      controller: _codeCtrl,
+                      enabled: !_loading,
+                      textInputAction: TextInputAction.next,
+                      style: const TextStyle(fontSize: 16, color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Código de Recuperación',
+                        hintText: 'Ingresa el código enviado a tu email',
+                        hintStyle: TextStyle(color: AppColors.gray.withOpacity(0.5)),
+                        prefixIcon: Icon(Icons.vpn_key, color: AppColors.gold),
+                        filled: true,
+                        fillColor: Colors.black26,
+                        labelStyle: const TextStyle(color: AppColors.gray),
+                        errorText: _codeError,
+                        errorStyle: const TextStyle(color: Colors.red),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.gray),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.gray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.gold, width: 2),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        // Limpiar error cuando el usuario empieza a escribir
+                        if (_codeError != null) {
+                          setState(() => _codeError = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 20),
 
                     // Campo Nueva Contraseña
                     TextFormField(
@@ -316,6 +389,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                             _buildPasswordCheck('Una letra mayúscula', passwordChecks['uppercase']!),
                             _buildPasswordCheck('Una letra minúscula', passwordChecks['lowercase']!),
                             _buildPasswordCheck('Un número', passwordChecks['number']!),
+                            _buildPasswordCheck('Un carácter especial', passwordChecks['special']!), // ✅ VALIDADOR ESPECIAL
                           ],
                         ),
                       ),

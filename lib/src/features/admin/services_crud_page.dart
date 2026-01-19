@@ -209,6 +209,7 @@ class _ServicesCrudPageState extends State<ServicesCrudPage> {
         title: Text('Gestión de Servicios', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.charcoal,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.gold),
       ),
       body: Column(
         children: [

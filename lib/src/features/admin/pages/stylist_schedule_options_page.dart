@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../../../api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
-import 'stylist_schedule_management_page.dart';
 // import 'stylist_services_schedule_page.dart'; // TODO: archivo no existe
 
 /// Página intermedia para elegir qué tipo de horario configurar
@@ -161,40 +160,41 @@ class _StylistScheduleOptionsPageState extends State<StylistScheduleOptionsPage>
           ),
           SizedBox(height: 24),
 
-          // Opción 1: Horario de Trabajo
+          // Opción: Crear Slots de Servicios
           _buildScheduleOptionCard(
-            title: 'Establecer Horario de Trabajo',
+            title: 'Crear Slots de Servicios',
             description:
-                'Configura las franjas horarias generales por día de la semana (qué horas trabaja)',
-            icon: Icons.schedule,
-            iconColor: Colors.blue,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => StylistScheduleManagementPage(
-                  token: widget.token,
-                  stylistId: widget.stylistId,
-                  stylistName: widget.stylistName,
-                  userRole: widget.userRole,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
-
-          // Opción 2: Horario de Servicios (Slots)
-          _buildScheduleOptionCard(
-            title: 'Establecer Horario de Servicios',
-            description:
-                'Crea slots (franjas de disponibilidad) para cada servicio en fechas específicas',
-            icon: Icons.event,
-            iconColor: Colors.orange,
+                'Genera disponibilidad (slots) para servicios específicos. El sistema automáticamente calcula los horarios basado en la duración del servicio.',
+            icon: Icons.event_available,
+            iconColor: Colors.green,
             onTap: () {
-              // TODO: Navigate to StylistServicesSchedulePage
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Página no disponible aún'),
-                  backgroundColor: Colors.orange,
+              // Mostrar mensaje informativo
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: AppColors.charcoal,
+                  title: Text(
+                    'ℹ️ Cómo Funcionan los Slots',
+                    style: TextStyle(color: AppColors.gold),
+                  ),
+                  content: Text(
+                    'Selecciona un servicio y especifica las horas que el estilista está disponible.\n\n'
+                    'El sistema automáticamente generará slots (franjas de citas) basado en:\n'
+                    '• Duración del servicio\n'
+                    '• + 30 minutos de descanso entre citas\n\n'
+                    'Ejemplo:\n'
+                    'Servicio: Corte (60 min)\n'
+                    'Horas: 09:00 - 18:00\n'
+                    'Slots generados: 09:00, 10:30, 12:00, 13:30, 15:00, 16:30',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Entendido', style: TextStyle(color: AppColors.charcoal)),
+                    ),
+                  ],
                 ),
               );
             },
@@ -205,8 +205,8 @@ class _StylistScheduleOptionsPageState extends State<StylistScheduleOptionsPage>
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              color: Colors.green.withOpacity(0.1),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(

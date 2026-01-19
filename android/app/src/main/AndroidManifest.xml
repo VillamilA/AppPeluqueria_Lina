@@ -21,9 +21,9 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     
     <application
-        android:label="peluqueria_lina_app"
+        android:label="LH peluquería"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/android">
         <activity
             android:name=".MainActivity"
             android:exported="true"

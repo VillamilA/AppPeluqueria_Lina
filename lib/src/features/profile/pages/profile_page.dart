@@ -383,6 +383,9 @@ _buildCompactOptions(userRole)
   }
 
   Widget _buildCompactOptions(String userRole) {
+    // Solo mostrar opciones relevantes por rol
+    final isClient = userRole.toLowerCase() == 'client';
+    
     return Column(
       children: [
         _buildOptionCard(
@@ -392,27 +395,32 @@ _buildCompactOptions(userRole)
           color: AppColors.gold,
           onTap: () => _navigateToChangePassword(),
         ),
-        SizedBox(height: 12),
-        _buildOptionCard(
-          icon: Icons.event_note,
-          title: 'Mis Citas',
-          subtitle: 'Historial de reservaciones',
-          color: AppColors.gold,
-          onTap: () => _navigateToBookingHistory(),
-        ),
-        SizedBox(height: 12),
-        _buildOptionCard(
-          icon: Icons.payment,
-          title: 'Historial de Pagos',
-          subtitle: 'Transacciones realizadas',
-          color: AppColors.gold,
-          onTap: () => _navigateToPaymentHistory(),
-        ),
+        // Solo mostrar Mis Citas y Pagos para clientes
+        if (isClient) ...[
+          SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.event_note,
+            title: 'Mis Citas',
+            subtitle: 'Historial de reservaciones',
+            color: AppColors.gold,
+            onTap: () => _navigateToBookingHistory(),
+          ),
+          SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.payment,
+            title: 'Historial de Pagos',
+            subtitle: 'Transacciones realizadas',
+            color: AppColors.gold,
+            onTap: () => _navigateToPaymentHistory(),
+          ),
+        ],
       ],
     );
   }
 
   Widget _buildExpandedOptions(String userRole) {
+    final isClient = userRole.toLowerCase() == 'client';
+    
     return Wrap(
       spacing: 16,
       runSpacing: 16,
@@ -428,28 +436,31 @@ _buildCompactOptions(userRole)
             isGridItem: true,
           ),
         ),
-        SizedBox(
-          width: 200,
-          child: _buildOptionCard(
-            icon: Icons.event_note,
-            title: 'Mis Citas',
-            subtitle: 'Historial',
-            color: AppColors.gold,
-            onTap: () => _navigateToBookingHistory(),
-            isGridItem: true,
+        // Solo mostrar para clientes
+        if (isClient) ...[
+          SizedBox(
+            width: 200,
+            child: _buildOptionCard(
+              icon: Icons.event_note,
+              title: 'Mis Citas',
+              subtitle: 'Historial',
+              color: AppColors.gold,
+              onTap: () => _navigateToBookingHistory(),
+              isGridItem: true,
+            ),
           ),
-        ),
-        SizedBox(
-          width: 200,
-          child: _buildOptionCard(
-            icon: Icons.payment,
-            title: 'Pagos',
-            subtitle: 'Transacciones',
-            color: AppColors.gold,
-            onTap: () => _navigateToPaymentHistory(),
-            isGridItem: true,
+          SizedBox(
+            width: 200,
+            child: _buildOptionCard(
+              icon: Icons.payment,
+              title: 'Pagos',
+              subtitle: 'Transacciones',
+              color: AppColors.gold,
+              onTap: () => _navigateToPaymentHistory(),
+              isGridItem: true,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

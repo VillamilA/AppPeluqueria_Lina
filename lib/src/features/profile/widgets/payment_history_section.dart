@@ -232,9 +232,9 @@ class _PaymentHistorySectionState extends State<PaymentHistorySection> {
   }
 
   String _formatCurrency(dynamic amount) {
-    if (amount == null) return '\$0';
+    if (amount == null) return '\$0.00';
     final value = amount is int ? amount.toDouble() : (amount as double);
-    return '\$${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
+    return '\$${value.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
   }
 
   @override
@@ -564,24 +564,34 @@ class _PaymentHistorySectionState extends State<PaymentHistorySection> {
                               ),
                             ),
                             const SizedBox(height: 4),
+                            // 🎯 Mostrar monto claro incluso en PENDING
                             Text(
-                              _formatCurrency(amount),
-                              style: const TextStyle(
+                              amount != null && (amount is num && amount > 0)
+                                ? _formatCurrency(amount)
+                                : '⚠️ N/A',
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.gold,
+                                color: (amount is num && amount > 0) 
+                                  ? AppColors.gold 
+                                  : Colors.red,
                                 fontSize: 20,
                               ),
                             ),
-                            if (paidAt != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Pagado: ${_formatDate(paidAt)}',
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 11,
-                                ),
+                            // Estado del pago
+                            const SizedBox(height: 4),
+                            Text(
+                              status == 'PAID' 
+                                ? 'Pagado: ${_formatDate(paidAt)}'
+                                : 'Estado: ${_getStatusLabel(status)}',
+                              style: TextStyle(
+                                color: status == 'PAID'
+                                  ? Colors.green.shade300
+                                  : status == 'PENDING'
+                                    ? Colors.orange.shade300
+                                    : Colors.grey[500],
+                                fontSize: 11,
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ],

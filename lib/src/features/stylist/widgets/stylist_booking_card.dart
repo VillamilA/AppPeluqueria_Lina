@@ -35,21 +35,32 @@ class StylistBookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final isPending = status == 'PENDING_STYLIST_CONFIRMATION';
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.charcoal,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: statusColor.withOpacity(0.3),
-          width: 1.5,
+          color: isPending 
+              ? Colors.orange 
+              : statusColor.withOpacity(0.4),
+          width: isPending ? 2.5 : 1.5,
         ),
         boxShadow: [
-          BoxShadow(
-            color: statusColor.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          if (isPending)
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+              spreadRadius: 1,
+            )
+          else
+            BoxShadow(
+              color: statusColor.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
         ],
       ),
       child: Padding(
@@ -57,6 +68,50 @@ class StylistBookingCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ══════════════════════════════════════════════
+            // ALERTA DE CONFIRMACIÓN PENDIENTE
+            // ══════════════════════════════════════════════
+            if (isPending)
+              Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.orange.withOpacity(0.4),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange,
+                          size: 18,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '⚠️ Esta cita necesita tu confirmación',
+                            style: TextStyle(
+                              color: Colors.orange.shade300,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                ],
+              ),
+
             // ══════════════════════════════════════════════
             // ENCABEZADO: Cliente y Estado
             // ══════════════════════════════════════════════
@@ -72,12 +127,13 @@ class StylistBookingCard extends StatelessWidget {
                         style: TextStyle(
                           color: AppColors.gold,
                           fontWeight: FontWeight.bold,
-                          fontSize: isMobile ? 13 : 14,
+                          fontSize: isMobile ? 14 : 15,
+                          letterSpacing: 0.3,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: isMobile ? 4 : 6),
+                      SizedBox(height: isMobile ? 5 : 6),
                       Text(
                         serviceName,
                         style: TextStyle(
@@ -93,15 +149,15 @@ class StylistBookingCard extends StatelessWidget {
                 SizedBox(width: 8),
                 Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 10 : 12,
-                    vertical: isMobile ? 5 : 6,
+                    horizontal: isMobile ? 11 : 13,
+                    vertical: isMobile ? 6 : 7,
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: statusColor,
-                      width: 1,
+                      color: statusColor.withOpacity(0.6),
+                      width: 1.5,
                     ),
                   ),
                   child: Text(
@@ -115,16 +171,25 @@ class StylistBookingCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: isMobile ? 12 : 14),
+            SizedBox(height: isMobile ? 14 : 16),
 
             // ══════════════════════════════════════════════
             // INFORMACIÓN DE FECHA Y HORA
             // ══════════════════════════════════════════════
             Container(
-              padding: EdgeInsets.all(isMobile ? 10 : 12),
+              padding: EdgeInsets.all(isMobile ? 11 : 13),
               decoration: BoxDecoration(
-                color: Colors.grey.shade900,
-                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.grey.shade800.withOpacity(0.6),
+                    Colors.grey.shade900.withOpacity(0.4),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: AppColors.gold.withOpacity(0.1),
+                  width: 0.5,
+                ),
               ),
               child: Column(
                 children: [
@@ -133,36 +198,41 @@ class StylistBookingCard extends StatelessWidget {
                       Icon(
                         Icons.calendar_today,
                         color: AppColors.gold,
-                        size: isMobile ? 16 : 18,
+                        size: isMobile ? 17 : 19,
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        date != null
-                            ? DateFormat('d MMMM, yyyy', 'es_ES').format(date!)
-                            : 'Sin fecha',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: isMobile ? 12 : 13,
-                          fontWeight: FontWeight.w500,
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          date != null
+                              ? DateFormat('d MMMM, yyyy', 'es_ES').format(date!)
+                              : 'Sin fecha',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isMobile ? 12 : 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: isMobile ? 8 : 10),
+                  SizedBox(height: isMobile ? 9 : 11),
                   Row(
                     children: [
                       Icon(
                         Icons.access_time,
                         color: AppColors.gold,
-                        size: isMobile ? 16 : 18,
+                        size: isMobile ? 17 : 19,
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        '$startTime - $endTime',
-                        style: TextStyle(
-                          color: AppColors.gold,
-                          fontSize: isMobile ? 13 : 14,
-                          fontWeight: FontWeight.bold,
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$startTime - $endTime',
+                          style: TextStyle(
+                            color: AppColors.gold,
+                            fontSize: isMobile ? 13 : 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                     ],
@@ -170,40 +240,50 @@ class StylistBookingCard extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(height: isMobile ? 10 : 12),
+            SizedBox(height: isMobile ? 12 : 14),
 
             // ══════════════════════════════════════════════
             // NOTAS DEL CLIENTE (si existen)
             // ══════════════════════════════════════════════
             if (notes != null && notes!.isNotEmpty) ...[
               Container(
-                padding: EdgeInsets.all(isMobile ? 10 : 12),
+                padding: EdgeInsets.all(isMobile ? 11 : 13),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade900.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(9),
                   border: Border.all(
-                    color: Colors.blue.withOpacity(0.3),
+                    color: Colors.blue.withOpacity(0.25),
                     width: 1,
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Preferencias del cliente:',
-                      style: TextStyle(
-                        color: Colors.blue.shade300,
-                        fontSize: isMobile ? 11 : 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.note_outlined,
+                          color: Colors.blue.shade300,
+                          size: 16,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Preferencias del cliente:',
+                          style: TextStyle(
+                            color: Colors.blue.shade300,
+                            fontSize: isMobile ? 11 : 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 6),
+                    SizedBox(height: 8),
                     Text(
                       notes!,
                       style: TextStyle(
-                        color: Colors.blue.shade100,
-                        fontSize: isMobile ? 11 : 12,
-                        fontStyle: FontStyle.italic,
+                        color: Colors.white70,
+                        fontSize: isMobile ? 12 : 13,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -213,88 +293,127 @@ class StylistBookingCard extends StatelessWidget {
             ],
 
             // ══════════════════════════════════════════════
-            // BOTONES DE ACCIONES
+            // BOTONES DE ACCIÓN
             // ══════════════════════════════════════════════
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (status == 'SCHEDULED' || status == 'PENDING' && onConfirm != null)
+                // BOTÓN CONFIRMAR (prominente si está pendiente)
+                if (onConfirm != null)
                   Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                    child: GestureDetector(
+                      onTap: onConfirm,
+                      child: Container(
                         padding: EdgeInsets.symmetric(
-                          vertical: isMobile ? 10 : 12,
+                          vertical: isPending ? 12 : 10,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        decoration: BoxDecoration(
+                          gradient: isPending
+                              ? LinearGradient(
+                                  colors: [
+                                    Colors.orange.shade700,
+                                    Colors.orange.shade600,
+                                  ],
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    Colors.blue.shade700,
+                                    Colors.blue.shade600,
+                                  ],
+                                ),
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isPending
+                                  ? Colors.orange.withOpacity(0.3)
+                                  : Colors.blue.withOpacity(0.2),
+                              blurRadius: isPending ? 12 : 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ),
-                      onPressed: onConfirm,
-                      icon: Icon(Icons.check, size: isMobile ? 16 : 18),
-                      label: Text(
-                        'Confirmar',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  )
-                else if (status == 'CONFIRMED' && onComplete != null)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.gold,
-                        foregroundColor: Colors.black,
-                        padding: EdgeInsets.symmetric(
-                          vertical: isMobile ? 10 : 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: onComplete,
-                      icon: Icon(Icons.done_all, size: isMobile ? 16 : 18),
-                      label: Text(
-                        'Completar',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          fontWeight: FontWeight.bold,
+                        child: Center(
+                          child: Text(
+                            isPending ? '🔔 CONFIRMAR' : '✓ Confirmar',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: isMobile ? 11 : 12,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                if (status == 'SCHEDULED' ||
-                    status == 'PENDING' ||
-                    status == 'CONFIRMED')
-                  SizedBox(width: isMobile ? 8 : 10),
-                if (status == 'SCHEDULED' ||
-                    status == 'PENDING' ||
-                    status == 'CONFIRMED')
+
+                // ESPACIADOR
+                if (onConfirm != null && (onComplete != null || onCancel != null))
+                  SizedBox(width: 10),
+
+                // BOTÓN COMPLETAR
+                if (onComplete != null)
                   Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(
-                          color: Colors.red,
-                          width: 1,
+                    child: GestureDetector(
+                      onTap: onComplete,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade900.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        padding: EdgeInsets.symmetric(
-                          vertical: isMobile ? 10 : 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        child: Center(
+                          child: Text(
+                            '✓✓ Completar',
+                            style: TextStyle(
+                              color: Colors.green.shade300,
+                              fontWeight: FontWeight.bold,
+                              fontSize: isMobile ? 11 : 12,
+                            ),
+                          ),
                         ),
                       ),
-                      onPressed: onCancel,
-                      icon: Icon(Icons.close, size: isMobile ? 16 : 18),
-                      label: Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                // ESPACIADOR
+                if ((onConfirm != null || onComplete != null) && onCancel != null)
+                  SizedBox(width: 10),
+
+                // BOTÓN CANCELAR
+                if (onCancel != null)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: onCancel,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade900.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(
+                            color: Colors.red.withOpacity(0.35),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '✕ Cancelar',
+                            style: TextStyle(
+                              color: Colors.red.shade300,
+                              fontWeight: FontWeight.bold,
+                              fontSize: isMobile ? 11 : 12,
+                            ),
+                          ),
                         ),
                       ),
                     ),
