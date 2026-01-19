@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/validators.dart';
 import '../../../utils/validators.dart' as form_validators;
+import '../../admin/admin_constants.dart';
 import 'auth_message_dialog.dart';
 
 class RegisterForm extends StatefulWidget {
@@ -108,14 +109,17 @@ class _RegisterFormState extends State<RegisterForm> {
             const SizedBox(height: 12),
             CustomInputField(
               controller: _telefonoCtrl,
-              label: 'Teléfono (ej: 0987654321)',
+              label: 'Teléfono (comienza con 09)',
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(10),
               ],
-              validator: form_validators.FormValidators.validatePhone,
+              validator: (_) {
+                final validation = FormValidations.validatePhoneMessage(_telefonoCtrl.text);
+                return validation;
+              },
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -147,10 +151,13 @@ class _RegisterFormState extends State<RegisterForm> {
             const SizedBox(height: 12),
             CustomInputField(
               controller: _correoCtrl,
-              label: 'Correo',
+              label: 'Correo (ej: usuario@ejemplo.com)',
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
-              validator: form_validators.FormValidators.validateEmail,
+              validator: (_) {
+                final validation = FormValidations.validateEmailMessage(_correoCtrl.text);
+                return validation;
+              },
             ),
             const SizedBox(height: 16),
             // Campo de contraseña con visualización de requisitos

@@ -35,9 +35,20 @@ class AdminConstants {
 
 // Validaciones
 class FormValidations {
+  // Email con estructura clara (ejemplo@dominio.com)
   static bool isValidEmail(String email) {
-    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    );
     return emailRegex.hasMatch(email);
+  }
+
+  static String? validateEmailMessage(String email) {
+    if (email.isEmpty) return 'El correo es requerido';
+    if (!isValidEmail(email)) {
+      return 'Formato inválido (ej: usuario@ejemplo.com)';
+    }
+    return null;
   }
 
   static bool isValidPassword(String password) {
@@ -46,13 +57,62 @@ class FormValidations {
     return passwordRegex.hasMatch(password);
   }
 
+  // Cédula: solo números, máximo 10 dígitos
   static bool isValidCedula(String cedula) {
-    return cedula.isNotEmpty && cedula.length >= 10;
+    if (cedula.isEmpty) return false;
+    final cedulaRegex = RegExp(r'^\d{1,10}$');
+    return cedulaRegex.hasMatch(cedula) && cedula.length <= 10;
   }
 
+  static String? validateCedulaMessage(String cedula) {
+    if (cedula.isEmpty) return 'La cédula es requerida';
+    if (!RegExp(r'^\d+$').hasMatch(cedula)) {
+      return 'Solo se permiten números';
+    }
+    if (cedula.length > 10) {
+      return 'Máximo 10 dígitos';
+    }
+    return null;
+  }
+
+  // Teléfono: debe comenzar con 09, máximo 10 dígitos
   static bool isValidPhone(String phone) {
-    final phoneRegex = RegExp(r'^(\+593|0)[0-9]{9,10}$');
-    return phoneRegex.hasMatch(phone.replaceAll(' ', ''));
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final phoneRegex = RegExp(r'^09\d{8}$');
+    return phoneRegex.hasMatch(cleanPhone) && cleanPhone.length == 10;
+  }
+
+  static String? validatePhoneMessage(String phone) {
+    if (phone.isEmpty) return 'El teléfono es requerido';
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (!RegExp(r'^\d+$').hasMatch(cleanPhone)) {
+      return 'Solo se permiten números';
+    }
+    if (!cleanPhone.startsWith('09')) {
+      return 'Debe comenzar con 09';
+    }
+    if (cleanPhone.length != 10) {
+      return 'Debe tener 10 dígitos';
+    }
+    return null;
+  }
+
+  // Nombre/Apellido: mínimo 3 caracteres, solo letras
+  static bool isValidName(String name) {
+    if (name.isEmpty || name.length < 3) return false;
+    final nameRegex = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{3,}$');
+    return nameRegex.hasMatch(name);
+  }
+
+  static String? validateNameMessage(String name) {
+    if (name.isEmpty) return 'Este campo es requerido';
+    if (name.length < 3) {
+      return 'Mínimo 3 caracteres';
+    }
+    if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$').hasMatch(name)) {
+      return 'Solo se permiten letras y espacios';
+    }
+    return null;
   }
 }
 

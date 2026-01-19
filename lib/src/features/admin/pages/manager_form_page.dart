@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../common/dialogs/app_dialogs.dart';
+import '../admin_constants.dart';
 import '../widgets/gender_selector.dart';
 
 class ManagerFormPage extends StatefulWidget {
@@ -63,13 +65,42 @@ class _ManagerFormPageState extends State<ManagerFormPage> with SingleTickerProv
   }
 
   Future<void> _save() async {
-    if (nombreCtrl.text.isEmpty) {
-      _showErrorSnack('El nombre es requerido');
+    // Validar nombre
+    final nombreValidation = FormValidations.validateNameMessage(nombreCtrl.text);
+    if (nombreValidation != null) {
+      _showErrorSnack(nombreValidation);
       return;
     }
 
+    // Validar apellido
+    final apellidoValidation = FormValidations.validateNameMessage(apellidoCtrl.text);
+    if (apellidoValidation != null) {
+      _showErrorSnack(apellidoValidation);
+      return;
+    }
+
+    // Validar cédula
+    final cedulaValidation = FormValidations.validateCedulaMessage(cedulaCtrl.text);
+    if (cedulaValidation != null) {
+      _showErrorSnack(cedulaValidation);
+      return;
+    }
+
+    // Validar teléfono
+    final telefonoValidation = FormValidations.validatePhoneMessage(telefonoCtrl.text);
+    if (telefonoValidation != null) {
+      _showErrorSnack(telefonoValidation);
+      return;
+    }
+
+    // Validar email (solo en creación)
     if (!widget.isEdit && emailCtrl.text.isEmpty) {
       _showErrorSnack('El email es requerido');
+      return;
+    }
+
+    if (!widget.isEdit && !FormValidations.isValidEmail(emailCtrl.text)) {
+      _showErrorSnack(FormValidations.validateEmailMessage(emailCtrl.text) ?? 'Email inválido');
       return;
     }
 
@@ -180,13 +211,35 @@ class _ManagerFormPageState extends State<ManagerFormPage> with SingleTickerProv
                           ],
                         ),
                         SizedBox(height: 16),
-                        _buildTextField(nombreCtrl, 'Nombre', Icons.person),
+                        _buildTextField(nombreCtrl, 'Nombre', Icons.person,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                            LengthLimitingTextInputFormatter(50),
+                          ],
+                        ),
                         SizedBox(height: 12),
-                        _buildTextField(apellidoCtrl, 'Apellido', Icons.person_outline),
+                        _buildTextField(apellidoCtrl, 'Apellido', Icons.person_outline,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                            LengthLimitingTextInputFormatter(50),
+                          ],
+                        ),
                         SizedBox(height: 12),
-                        _buildTextField(cedulaCtrl, 'Cédula', Icons.credit_card),
+                        _buildTextField(cedulaCtrl, 'Cédula (máx 10 números)', Icons.credit_card,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                        ),
                         SizedBox(height: 12),
-                        _buildTextField(telefonoCtrl, 'Teléfono', Icons.phone),
+                        _buildTextField(telefonoCtrl, 'Teléfono (comienza con 09)', Icons.phone,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                        ),
                         SizedBox(height: 12),
                         Text(
                           'Género',
@@ -297,10 +350,19 @@ class _ManagerFormPageState extends State<ManagerFormPage> with SingleTickerProv
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isPassword = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool isPassword = false,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
