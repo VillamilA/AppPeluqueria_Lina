@@ -773,7 +773,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           title: 'Cita cancelada',
           message: 'Tu cita ha sido cancelada exitosamente',
           onAccept: () {
-            Navigator.pop(context);
+            // Solo actualizar la lista, no hacer Navigator.pop
             _fetchMyBookings();
           },
         );

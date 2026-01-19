@@ -6,6 +6,7 @@ import '../../widgets/search_bar_widget.dart';
 import 'dart:convert';
 import '../../core/theme/app_theme.dart';
 import 'pages/catalog_form_page.dart';
+import 'dialogs/manage_catalog_services_dialog.dart';
 
 class CatalogManagementPage extends StatefulWidget {
   final String token;
@@ -240,6 +241,31 @@ class _CatalogManagementPageState extends State<CatalogManagementPage> {
     );
   }
 
+  void _showManageServicesDialog(Map<String, dynamic> catalog) {
+    print('📌 [CATALOG_PAGE] Abriendo diálogo para catálogo: ${catalog['_id']}');
+    print('📌 [CATALOG_PAGE] Servicios actuales: ${catalog['services']}');
+    
+    showDialog(
+      context: context,
+      builder: (context) => ManageCatalogServicesDialog(
+        token: widget.token,
+        catalogId: catalog['_id'] ?? '',
+        currentServices: (catalog['services'] ?? []) as List<dynamic>,
+        onServicesSaved: (serviceIds) {
+          print('📌 [CATALOG_PAGE] Servicios guardados: $serviceIds');
+          // Actualizar el catálogo en la lista local
+          final index = catalogs.indexWhere((c) => c['_id'] == catalog['_id']);
+          if (index != -1) {
+            setState(() {
+              catalogs[index]['services'] = serviceIds;
+              _applyFilter();
+            });
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final int activeCount = catalogs.where((c) => c['activo'] == true).length;
@@ -440,6 +466,12 @@ class _CatalogManagementPageState extends State<CatalogManagementPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                _buildActionButton(
+                  icon: Icons.miscellaneous_services,
+                  label: 'Servicios',
+                  color: Colors.blue,
+                  onPressed: () => _showManageServicesDialog(c),
+                ),
                 _buildActionButton(
                   icon: Icons.edit,
                   label: 'Editar',

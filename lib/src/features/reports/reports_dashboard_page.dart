@@ -917,30 +917,30 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
   Widget _buildEnhancedStatusLegend(List<BookingByStatus> data) {
     // Crear mapa de colores y etiquetas consistentes con el gráfico
     final colorMap = {
+      'SCHEDULED': Color(0xFF3B82F6),
+      'PENDING_STYLIST_CONFIRMATION': Color(0xFFF59E0B),
+      'CONFIRMED': Color(0xFF8B5CF6),
       'COMPLETED': Color(0xFF10B981),
       'CANCELLED': Color(0xFFEF4444),
-      'NO_SHOW': Color(0xFFF59E0B),
-      'PENDING': Color(0xFF3B82F6),
-      'CONFIRMED': Color(0xFF8B5CF6),
-      'IN_PROGRESS': Color(0xFF06B6D4),
+      'NO_SHOW': Color(0xFF6B7280),
     };
 
     final labelMap = {
-      'COMPLETED': 'Completado',
-      'CANCELLED': 'Cancelado',
-      'NO_SHOW': 'No Presentado',
-      'PENDING': 'Pendiente',
-      'CONFIRMED': 'Confirmado',
-      'IN_PROGRESS': 'En Progreso',
+      'SCHEDULED': 'Programada',
+      'PENDING_STYLIST_CONFIRMATION': 'Esperando confirmación',
+      'CONFIRMED': 'Confirmada',
+      'COMPLETED': 'Completada',
+      'CANCELLED': 'Cancelada',
+      'NO_SHOW': 'No presentada',
     };
 
-    final iconMap = {
-      'COMPLETED': Icons.check_circle,
-      'CANCELLED': Icons.cancel,
-      'NO_SHOW': Icons.no_accounts,
-      'PENDING': Icons.schedule,
-      'CONFIRMED': Icons.verified,
-      'IN_PROGRESS': Icons.hourglass_bottom,
+    final emojiMap = {
+      'SCHEDULED': '📅',
+      'PENDING_STYLIST_CONFIRMATION': '⏳',
+      'CONFIRMED': '✅',
+      'COMPLETED': '🎉',
+      'CANCELLED': '❌',
+      'NO_SHOW': '🚫',
     };
 
     final total = data.fold<int>(0, (sum, item) => sum + item.count);
@@ -970,7 +970,7 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
             children: data.map((item) {
               final label = labelMap[item.status] ?? item.status;
               final color = colorMap[item.status] ?? Colors.grey;
-              final icon = iconMap[item.status] ?? Icons.circle;
+              final emoji = emojiMap[item.status] ?? '⭕';
               final percentage = (item.count / total) * 100;
 
               return Container(
@@ -986,18 +986,7 @@ class _ReportsDashboardPageState extends State<ReportsDashboardPage> with Single
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(
-                            icon,
-                            size: 16,
-                            color: color,
-                          ),
-                        ),
+                        Text(emoji, style: TextStyle(fontSize: 18)),
                         const SizedBox(width: 8),
                         Column(
                           mainAxisSize: MainAxisSize.min,

@@ -57,7 +57,8 @@ class _VerifyEmailDialogState extends State<VerifyEmailDialog> {
     setState(() => _isResending = true);
 
     try {
-      await VerificationService.instance.resendVerificationEmail(widget.email);
+      // Usar sendVerificationEmail porque el usuario NO está autenticado después del registro
+      await VerificationService.instance.sendVerificationEmail(widget.email);
 
       if (mounted) {
         await showMessageDialog(

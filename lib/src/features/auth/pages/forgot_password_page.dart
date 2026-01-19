@@ -86,6 +86,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       color: AppColors.gold,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ],

@@ -19,11 +19,9 @@ class ChangePasswordSection extends StatefulWidget {
 
 class _ChangePasswordSectionState extends State<ChangePasswordSection> {
   final _formKey = GlobalKey<FormState>();
-  final _currentPasswordCtrl = TextEditingController();
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
 
-  bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   bool _loading = false;
@@ -38,7 +36,6 @@ class _ChangePasswordSectionState extends State<ChangePasswordSection> {
 
   @override
   void dispose() {
-    _currentPasswordCtrl.dispose();
     _newPasswordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -59,12 +56,13 @@ class _ChangePasswordSectionState extends State<ChangePasswordSection> {
     setState(() => _loading = true);
 
     try {
+      // Según documentación: PUT /api/v1/users/me solo requiere el token
+      // El endpoint actualiza solo los campos enviados
       final body = {
-        'currentPassword': _currentPasswordCtrl.text,
-        'newPassword': _newPasswordCtrl.text,
+        'password': _newPasswordCtrl.text,
       };
 
-      final response = await _usersApi.changePassword(body, widget.token);
+      final response = await _usersApi.updateMyProfile(body, widget.token);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
@@ -73,7 +71,6 @@ class _ChangePasswordSectionState extends State<ChangePasswordSection> {
             title: 'Contraseña actualizada',
             message: 'Tu contraseña ha sido cambiada correctamente',
             onAccept: () {
-              _currentPasswordCtrl.clear();
               _newPasswordCtrl.clear();
               _confirmPasswordCtrl.clear();
               Navigator.pop(context);
@@ -126,16 +123,6 @@ class _ChangePasswordSectionState extends State<ChangePasswordSection> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildPasswordField(
-              controller: _currentPasswordCtrl,
-              label: 'Contraseña Actual',
-              hint: 'Ingresa tu contraseña actual',
-              obscure: _obscureCurrentPassword,
-              onToggleObscure: () => setState(
-                () => _obscureCurrentPassword = !_obscureCurrentPassword,
-              ),
-            ),
-            const SizedBox(height: 12),
             _buildPasswordField(
               controller: _newPasswordCtrl,
               label: 'Nueva Contraseña',

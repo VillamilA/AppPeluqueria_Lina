@@ -51,6 +51,24 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        
+        // DEBUG: Imprimir los datos recibidos
+        print('=== GENERAL_REPORT DEBUG ===');
+        print('Data keys: ${(data as Map).keys.toList()}');
+        
+        if (data['bookingsByStatus'] != null) {
+          print('bookingsByStatus:');
+          for (var status in data['bookingsByStatus']) {
+            print('  - ${status}');
+          }
+        } else {
+          print('bookingsByStatus es NULL');
+        }
+        
+        if (data['totals'] != null) {
+          print('totals: ${data['totals']}');
+        }
+        
         setState(() {
           reportData = (data as Map<String, dynamic>?) ?? {};
           isLoading = false;
@@ -138,6 +156,14 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
             _buildKPICards(),
             SizedBox(height: 24),
             _buildDetailedMetrics(),
+            SizedBox(height: 24),
+            _buildRevenueByDaySection(),
+            SizedBox(height: 24),
+            _buildRevenueByStylistSection(),
+            SizedBox(height: 24),
+            _buildRatingsByStylistSection(),
+            SizedBox(height: 24),
+            _buildDownloadPdfSection(),
             SizedBox(height: 24),
           ],
         ),
@@ -361,14 +387,17 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
     final bookingsByStatus = reportData['bookingsByStatus'] as List<dynamic>? ?? [];
     final topServices = reportData['topServices'] as List<dynamic>? ?? [];
     
-    final totalRevenue = (totals['totalRevenue'] ?? 0.0) as num;
-    final totalBookings = (totals['totalBookings'] ?? 0) as num;
+    final totalRevenue = ((totals['totalRevenue'] ?? 0.0) as num).toDouble();
+    final totalPaidBookings = (totals['totalPaidBookings'] ?? 0) as int;
     
     // Contar citas completadas
     int completedBookings = 0;
     for (var status in bookingsByStatus) {
-      if (status is Map && status['_id'] == 'COMPLETED') {
-        completedBookings = status['count'] ?? 0;
+      if (status is Map) {
+        final statusId = (status['_id'] ?? '').toString().toUpperCase().trim();
+        if (statusId == 'COMPLETED') {
+          completedBookings = (status['count'] ?? 0) as int;
+        }
       }
     }
 
@@ -377,8 +406,14 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
     int topServiceCount = 0;
     if (topServices.isNotEmpty && topServices[0] is Map) {
       topServiceName = topServices[0]['serviceName'] ?? 'N/A';
-      topServiceCount = topServices[0]['bookingsCount'] ?? 0;
+      topServiceCount = (topServices[0]['bookingsCount'] ?? 0) as int;
     }
+    
+    print('[KPI_CARDS DEBUG]');
+    print('  totalRevenue: $totalRevenue');
+    print('  totalPaidBookings: $totalPaidBookings');
+    print('  completedBookings: $completedBookings');
+    print('  topServiceName: $topServiceName');
 
     return GridView.count(
       crossAxisCount: 2,
@@ -402,7 +437,7 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
         ),
         _buildKPICard(
           title: 'Total de Citas',
-          value: '${totalBookings.toInt()}',
+          value: '${totalPaidBookings.toInt()}',
           icon: Icons.calendar_today,
           color: Colors.orange.shade700,
         ),
@@ -513,22 +548,45 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
   Widget _buildDetailedMetrics() {
     final bookingsByStatus = reportData['bookingsByStatus'] as List<dynamic>? ?? [];
     
-    // Mapear estados a conteos
+    // Mapear estados a conteos con orden específico
     Map<String, int> statusCounts = {
-      'COMPLETED': 0,
       'SCHEDULED': 0,
+      'PENDING_STYLIST_CONFIRMATION': 0,
+      'CONFIRMED': 0,
+      'COMPLETED': 0,
       'CANCELLED': 0,
+      'NO_SHOW': 0,
     };
+    
+    print('🔍 DEBUG _buildDetailedMetrics:');
+    print('  - bookingsByStatus list length: ${bookingsByStatus.length}');
+    print('  - Raw data: $bookingsByStatus');
     
     for (var status in bookingsByStatus) {
       if (status is Map) {
-        final statusId = status['_id'] ?? '';
-        final count = status['count'] ?? 0;
-        if (statusCounts.containsKey(statusId)) {
-          statusCounts[statusId] = count;
+        final statusId = (status['_id'] ?? 'UNKNOWN').toString().toUpperCase().trim();
+        final count = (status['count'] ?? 0) as int;
+        
+        print('  - Status encontrado: "$statusId" = $count citas');
+        
+        // Buscar coincidencia en el mapa (flexible)
+        bool found = false;
+        for (var key in statusCounts.keys) {
+          if (key.toUpperCase() == statusId) {
+            statusCounts[key] = count;
+            found = true;
+            print('    ✅ Mapeado a: $key');
+            break;
+          }
+        }
+        
+        if (!found) {
+          print('    ⚠️  Status "$statusId" NO coincide con ninguno esperado');
         }
       }
     }
+    
+    print('  - statusCounts final: $statusCounts');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,24 +609,51 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
           child: Column(
             children: [
               _buildStatusMetricRow(
-                'Completadas',
-                statusCounts['COMPLETED'] ?? 0,
-                Colors.green.shade400,
-                Icons.check_circle,
-              ),
-              Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
-              _buildStatusMetricRow(
-                'Programadas',
+                '📅 SCHEDULED',
+                'Programada',
                 statusCounts['SCHEDULED'] ?? 0,
                 Colors.blue.shade400,
                 Icons.calendar_today,
               ),
               Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
               _buildStatusMetricRow(
-                'Canceladas',
+                '⏳ PENDING_STYLIST_CONFIRMATION',
+                'Esperando confirmación del estilista',
+                statusCounts['PENDING_STYLIST_CONFIRMATION'] ?? 0,
+                Colors.amber.shade400,
+                Icons.schedule,
+              ),
+              Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
+              _buildStatusMetricRow(
+                '✅ CONFIRMED',
+                'Confirmada por estilista',
+                statusCounts['CONFIRMED'] ?? 0,
+                Colors.purple.shade400,
+                Icons.task_alt,
+              ),
+              Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
+              _buildStatusMetricRow(
+                '🎉 COMPLETED',
+                'Finalizada y pagada',
+                statusCounts['COMPLETED'] ?? 0,
+                Colors.green.shade400,
+                Icons.check_circle,
+              ),
+              Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
+              _buildStatusMetricRow(
+                '❌ CANCELLED',
+                'Cancelada',
                 statusCounts['CANCELLED'] ?? 0,
                 Colors.red.shade400,
                 Icons.cancel,
+              ),
+              Divider(color: AppColors.gold.withOpacity(0.2), height: 20),
+              _buildStatusMetricRow(
+                '🚫 NO_SHOW',
+                'Cliente no asistió',
+                statusCounts['NO_SHOW'] ?? 0,
+                Colors.grey.shade400,
+                Icons.no_meeting_room,
               ),
             ],
           ),
@@ -579,6 +664,7 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
 
   Widget _buildStatusMetricRow(
     String label,
+    String description,
     int count,
     Color color,
     IconData icon,
@@ -588,20 +674,354 @@ class _GeneralReportTabState extends State<GeneralReportTab> {
         Icon(icon, color: color, size: 24),
         SizedBox(width: 12),
         Expanded(
-          child: Text(
-            label,
-            style: TextStyle(color: AppColors.gray, fontSize: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: AppColors.gold,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                description,
+                style: TextStyle(
+                  color: AppColors.gray,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
         ),
         Text(
           '$count',
           style: TextStyle(
             color: color,
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRevenueByDaySection() {
+    final revenueByDay = reportData['revenueByDay'] as List<dynamic>? ?? [];
+    
+    if (revenueByDay.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ingresos por Día',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildTableHeader(['Fecha', 'Ingresos', 'Citas']),
+              SizedBox(height: 8),
+              ...revenueByDay.take(10).map((item) {
+                if (item is! Map) return SizedBox.shrink();
+                final day = item['day'] ?? 'N/A';
+                final total = ((item['total'] ?? 0.0) as num).toDouble();
+                final count = (item['count'] ?? 0) as int;
+                
+                return Column(
+                  children: [
+                    _buildTableRow([day, '\$${total.toStringAsFixed(2)}', '$count']),
+                    Divider(color: AppColors.gold.withOpacity(0.1), height: 1),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRevenueByStylistSection() {
+    final revenueByStylist = reportData['revenueByStylist'] as List<dynamic>? ?? [];
+    
+    if (revenueByStylist.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ingresos por Estilista',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildTableHeader(['Estilista', 'Ingresos', 'Citas']),
+              SizedBox(height: 8),
+              ...revenueByStylist.map((item) {
+                if (item is! Map) return SizedBox.shrink();
+                final name = item['stylistName'] ?? 'N/A';
+                final revenue = ((item['totalRevenue'] ?? 0.0) as num).toDouble();
+                final count = (item['bookingsCount'] ?? 0) as int;
+                
+                return Column(
+                  children: [
+                    _buildTableRow([name, '\$${revenue.toStringAsFixed(2)}', '$count']),
+                    Divider(color: AppColors.gold.withOpacity(0.1), height: 1),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRatingsByStylistSection() {
+    final ratingsByStylist = reportData['ratingsByStylist'] as List<dynamic>? ?? [];
+    
+    if (ratingsByStylist.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ratings por Estilista',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildTableHeader(['Estilista', 'Rating', 'Reseñas']),
+              SizedBox(height: 8),
+              ...ratingsByStylist.map((item) {
+                if (item is! Map) return SizedBox.shrink();
+                final name = item['stylistName'] ?? 'N/A';
+                final rating = ((item['avgRating'] ?? 0.0) as num).toDouble();
+                final count = (item['ratingsCount'] ?? 0) as int;
+                
+                return Column(
+                  children: [
+                    _buildTableRow([name, '⭐ ${rating.toStringAsFixed(1)}', '$count']),
+                    Divider(color: AppColors.gold.withOpacity(0.1), height: 1),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableHeader(List<String> headers) {
+    return Row(
+      children: headers.map((header) {
+        return Expanded(
+          child: Text(
+            header,
+            style: TextStyle(
+              color: AppColors.gold,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildTableRow(List<String> values) {
+    return Row(
+      children: values.map((value) {
+        return Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: AppColors.gray,
+              fontSize: 12,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDownloadPdfSection() {
+    final range = reportData['range'] as Map<String, dynamic>? ?? {};
+    final label = range['label'] ?? 'Período actual';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Descargas',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: _downloadGeneralReportPdf,
+                icon: Icon(Icons.download),
+                label: Text(
+                  'Descargar PDF',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: _downloadStylistsReportPdf,
+                icon: Icon(Icons.description),
+                label: Text(
+                  'Estilistas PDF',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        Text(
+          'Período: $label',
+          style: TextStyle(
+            color: AppColors.gray,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _downloadGeneralReportPdf() async {
+    try {
+      final now = DateTime.now();
+      final from = _selectedFromDate ?? now.subtract(Duration(days: 30));
+      final to = _selectedToDate ?? now;
+      
+      final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+      final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+      
+      final api = ReportsApi(ApiClient.instance);
+      final response = await api.downloadGeneralReportPdf(
+        token: widget.token,
+        fromDate: fromStr,
+        toDate: toStr,
+      );
+
+      if (response.statusCode == 200) {
+        _showSuccessDialog('PDF descargado correctamente');
+      } else {
+        _showErrorDialog('Error al descargar el PDF');
+      }
+    } catch (e) {
+      _showErrorDialog('Error: $e');
+    }
+  }
+
+  Future<void> _downloadStylistsReportPdf() async {
+    try {
+      final now = DateTime.now();
+      final from = _selectedFromDate ?? now.subtract(Duration(days: 30));
+      final to = _selectedToDate ?? now;
+      
+      final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+      final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+      
+      final api = ReportsApi(ApiClient.instance);
+      final response = await api.downloadStylistsReportPdf(
+        token: widget.token,
+        fromDate: fromStr,
+        toDate: toStr,
+      );
+
+      if (response.statusCode == 200) {
+        _showSuccessDialog('PDF de estilistas descargado correctamente');
+      } else {
+        _showErrorDialog('Error al descargar el PDF');
+      }
+    } catch (e) {
+      _showErrorDialog('Error: $e');
+    }
+  }
+
+  void _showSuccessDialog(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green.shade700,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        duration: Duration(seconds: 3),
+      ),
     );
   }
 }

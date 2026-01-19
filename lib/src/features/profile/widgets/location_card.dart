@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../services/business_hours_service.dart';
 
 /// Widget que muestra la ubicación de Peluquería Lina con mapa interactivo
 class LocationCard extends StatefulWidget {
@@ -25,11 +26,43 @@ class _LocationCardState extends State<LocationCard> {
   double? _distanceInKm;
   bool _loadingLocation = false;
   String? _locationError;
+  
+  Map<int, BusinessHours>? _businessHours;
+  bool _loadingBusinessHours = false;
 
   @override
   void initState() {
     super.initState();
     _getUserLocation();
+    _loadBusinessHours();
+  }
+
+  Future<void> _loadBusinessHours() async {
+    setState(() {
+      _loadingBusinessHours = true;
+    });
+
+    try {
+      print('🕐 [LocationCard] Cargando horarios del negocio...');
+      final service = BusinessHoursService();
+      service.initialize();
+      final hours = await service.getBusinessHours();
+      
+      print('🕐 [LocationCard] Horarios cargados: ${hours.length} días');
+      hours.forEach((day, hour) {
+        print('🕐 [LocationCard] Día $day: ${hour.openTime} - ${hour.closeTime}');
+      });
+      
+      setState(() {
+        _businessHours = hours;
+        _loadingBusinessHours = false;
+      });
+    } catch (e) {
+      print('❌ [LocationCard] Error cargando horarios del negocio: $e');
+      setState(() {
+        _loadingBusinessHours = false;
+      });
+    }
   }
 
   Future<void> _getUserLocation() async {
@@ -160,6 +193,63 @@ class _LocationCardState extends State<LocationCard> {
     }
   }
 
+  List<Widget> _buildBusinessHoursRows() {
+    if (_businessHours == null || _businessHours!.isEmpty) {
+      return [];
+    }
+
+    final dayNames = {
+      0: 'Lun',
+      1: 'Mar',
+      2: 'Mié',
+      3: 'Jue',
+      4: 'Vie',
+      5: 'Sáb',
+      6: 'Dom',
+    };
+
+    List<Widget> rows = [];
+    
+    // Ordenar por día de la semana (0 = Lunes, 6 = Domingo)
+    final sortedDays = _businessHours!.keys.toList()..sort();
+    
+    for (var dayOfWeek in sortedDays) {
+      final hours = _businessHours![dayOfWeek]!;
+      
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 50,
+                child: Text(
+                  dayNames[dayOfWeek] ?? 'Día',
+                  style: TextStyle(
+                    color: AppColors.gray,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${hours.openTime} - ${hours.closeTime}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -274,7 +364,7 @@ class _LocationCardState extends State<LocationCard> {
 
           // Map
           SizedBox(
-            height: widget.isCompact ? 300 : 380,
+            height: widget.isCompact ? 350 : 450,
             child: ClipRRect(
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(0),
@@ -425,38 +515,7 @@ class _LocationCardState extends State<LocationCard> {
             padding: const EdgeInsets.all(18),
             child: Column(
               children: [
-                // Info de distancia o error
-                if (_locationError != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _locationError!,
-                            style: const TextStyle(color: Colors.orange, fontSize: 12),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _getUserLocation,
-                          child: const Text(
-                            'Reintentar',
-                            style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Buttons
+                // Buttons (debajo del mapa)
                 Row(
                   children: [
                     Expanded(
@@ -499,6 +558,181 @@ class _LocationCardState extends State<LocationCard> {
                       ),
                     ),
                   ],
+                ),
+
+                SizedBox(height: 20),
+
+                // Info de distancia o error
+                if (_locationError != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _locationError!,
+                            style: const TextStyle(color: Colors.orange, fontSize: 12),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _getUserLocation,
+                          child: const Text(
+                            'Reintentar',
+                            style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Sección de contacto
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.gold.withValues(alpha: 0.15),
+                        AppColors.gold.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+                  ),
+                  child: InkWell(
+                    onTap: () async {
+                      final uri = Uri.parse('tel:+593980865549');
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error al realizar la llamada'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.phone, color: AppColors.gold, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Contacto',
+                                style: TextStyle(
+                                  color: AppColors.gray,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                '+593 98 086 5549',
+                                style: TextStyle(
+                                  color: AppColors.gold,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          color: AppColors.gold.withValues(alpha: 0.5),
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Sección de horarios del negocio
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.gold.withValues(alpha: 0.15),
+                        AppColors.gold.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.access_time, color: AppColors.gold, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Text(
+                            'Horario de Atención',
+                            style: TextStyle(
+                              color: AppColors.gold,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (_loadingBusinessHours)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                        )
+                      else if (_businessHours != null && _businessHours!.isNotEmpty)
+                        ..._buildBusinessHoursRows()
+                      else
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'No hay horarios configurados',
+                            style: TextStyle(
+                              color: AppColors.gray,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),

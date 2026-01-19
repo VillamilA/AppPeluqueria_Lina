@@ -50,7 +50,18 @@ class _UnverifiedEmailDialogState extends State<UnverifiedEmailDialog> {
     setState(() => _isResending = true);
 
     try {
-      await VerificationService.instance.resendVerificationEmail(widget.email);
+      // Si tiene token (usuario logueado), usar resendVerificationEmail
+      // Si NO tiene token, usar sendVerificationEmail (endpoint público)
+      if (widget.token.isNotEmpty) {
+        // Usuario intentó login pero email no verificado - tiene token temporal
+        await VerificationService.instance.resendVerificationEmail(
+          widget.email,
+          tokenParam: widget.token,
+        );
+      } else {
+        // Usuario no logueado - usar endpoint público
+        await VerificationService.instance.sendVerificationEmail(widget.email);
+      }
 
       if (mounted) {
         await showMessageDialog(

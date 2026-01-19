@@ -21,17 +21,12 @@ class VerificationService {
     return _authVerificationApi!;
   }
 
-  /// Enviar correo de verificación
+  /// Enviar correo de verificación (SIN autenticación)
   Future<bool> sendVerificationEmail(String email) async {
     try {
-      final token = await TokenStorage.instance.getAccessToken();
-      if (token == null || token.isEmpty) {
-        throw Exception('Token no disponible');
-      }
-
       final res = await _getApi().sendVerificationEmail(
         email: email,
-        token: token,
+        token: null, // No requiere token
       );
 
       print('📧 Response status: ${res.statusCode}');
@@ -57,9 +52,17 @@ class VerificationService {
   }
 
   /// Reenviar correo de verificación (con cooldown 90s)
-  Future<bool> resendVerificationEmail(String email) async {
+  /// 
+  /// Si [tokenParam] es provided, lo usa.
+  /// Si no, lo obtiene de TokenStorage.
+  Future<bool> resendVerificationEmail(String email, {String? tokenParam}) async {
     try {
-      final token = await TokenStorage.instance.getAccessToken();
+      // Usar token proporcionado o obtenerlo del almacenamiento
+      String? token = tokenParam;
+      if (token == null || token.isEmpty) {
+        token = await TokenStorage.instance.getAccessToken();
+      }
+      
       if (token == null || token.isEmpty) {
         throw Exception('Token no disponible');
       }

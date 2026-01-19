@@ -1280,11 +1280,14 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop(); // Cerrar diálogo
+                    // Redirigir automáticamente al dashboard del cliente
                     Future.delayed(const Duration(milliseconds: 300), () {
                       if (mounted) {
-                        // Regresar al dashboard (2 pops: página de estilista + página anterior)
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pop();
+                        // Navegar al dashboard y limpiar el stack
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/dashboard',
+                          (route) => false,
+                        );
                       }
                     });
                   },
@@ -1362,4 +1365,6 @@ class _StylistDetailPageState extends State<StylistDetailPage> {
       print('✅ Notificación enviada correctamente');
     } catch (e) {
       print('❌ Error al enviar notificación: $e');
-}}}
+    }
+  }
+}

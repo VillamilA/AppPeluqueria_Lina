@@ -3,8 +3,8 @@ import '../../core/theme/app_theme.dart';
 import '../../api/stylist_bookings_api.dart';
 import '../../api/api_client.dart';
 import 'dart:convert';
-import '../../widgets/cancel_booking_dialog.dart';
 import 'widgets/stylist_booking_card.dart';
+import 'widgets/booking_action_dialog.dart';
 
 class StylistBookingsTab extends StatefulWidget {
   final String token;
@@ -22,7 +22,7 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
   late StylistBookingsApi _api;
   List<dynamic> _bookings = [];
   bool _loading = true;
-  String _filterStatus = 'SCHEDULED';
+  String _filterStatus = 'PENDING_STYLIST_CONFIRMATION';
   String _errorMessage = '';
 
   @override
@@ -93,22 +93,108 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
 
   Future<void> _confirmBooking(String bookingId) async {
     try {
+      print('🔵 [CONFIRM] Iniciando confirmación de cita: $bookingId');
+      print('   Token: ${widget.token.substring(0, 20)}...');
+      
+      // Mostrar diálogo de confirmación
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text(
+            '¿Confirmar esta cita?',
+            style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppColors.charcoal,
+          content: Text(
+            'Una vez confirmada, el cliente recibirá una notificación por correo.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancelar', style: TextStyle(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+              ),
+              child: Text('✓ Confirmar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) {
+        print('ℹ️  [CONFIRM] Usuario canceló la confirmación');
+        return;
+      }
+
       final response = await _api.confirmBooking(bookingId, widget.token);
+      print('📥 [CONFIRM] Response status: ${response.statusCode}');
+      print('📥 [CONFIRM] Response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reserva confirmada'), backgroundColor: Colors.green),
+        print('✅ [CONFIRM] Cita confirmada exitosamente');
+        
+        // Mostrar pop-up de éxito
+        await BookingActionDialog.showSuccess(
+          context,
+          title: '✓ ¡Confirmada!',
+          message: 'La cita ha sido confirmada exitosamente.\nEl cliente recibirá notificación.',
+          icon: '✓',
+          duration: Duration(seconds: 3),
         );
+        
+        // Recargar las citas
         await _loadBookings();
         // Cambiar automáticamente al tab de "Confirmadas"
-        setState(() => _filterStatus = 'CONFIRMED');
+        if (mounted) {
+          setState(() => _filterStatus = 'CONFIRMED');
+        }
+      } else if (response.statusCode == 400) {
+        print('❌ [CONFIRM] Error 400 - Solicitud inválida');
+        print('   Body: ${response.body}');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Error',
+          message: 'La cita no puede ser confirmada en este momento.',
+          icon: '❌',
+        );
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        print('❌ [CONFIRM] Error ${response.statusCode} - No autorizado');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Sesión Expirada',
+          message: 'Por favor, inicia sesión nuevamente.',
+          icon: '🔒',
+        );
+      } else if (response.statusCode == 404) {
+        print('❌ [CONFIRM] Error 404 - Cita no encontrada');
+        await BookingActionDialog.showError(
+          context,
+          title: 'No Encontrada',
+          message: 'La cita no fue encontrada en el sistema.',
+          icon: '❓',
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al confirmar'), backgroundColor: Colors.red),
+        print('❌ [CONFIRM] Error ${response.statusCode}');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Error',
+          message: 'Hubo un error al confirmar la cita (${response.statusCode})',
+          icon: '⚠️',
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    } catch (e, st) {
+      print('❌ [CONFIRM] Excepción: $e');
+      print('   Stack: $st');
+      await BookingActionDialog.showError(
+        context,
+        title: 'Error',
+        message: 'Error: $e',
+        icon: '⚠️',
       );
     }
   }
@@ -159,60 +245,270 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
         clienteAsistio: clienteAsistio,
         precio: null,
       );
+      
       if (response.statusCode == 200) {
-        final statusText = clienteAsistio ? 'Reserva completada' : 'Marcado como no asistió';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(statusText),
-            backgroundColor: clienteAsistio ? Colors.green : Colors.purple,
-          ),
+        final statusText = clienteAsistio ? 'completada' : 'no asistió';
+        final icon = clienteAsistio ? '✅' : '❌';
+        
+        await BookingActionDialog.showSuccess(
+          context,
+          title: '¡Listo!',
+          message: 'La cita ha sido marcada como $statusText.',
+          icon: icon,
+          duration: Duration(seconds: 3),
         );
+        
         await _loadBookings();
         // Cambiar automáticamente al tab de estado correspondiente
-        setState(() => _filterStatus = clienteAsistio ? 'COMPLETED' : 'NO_SHOW');
+        if (mounted) {
+          setState(() => _filterStatus = clienteAsistio ? 'COMPLETED' : 'NO_SHOW');
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al completar'), backgroundColor: Colors.red),
+        await BookingActionDialog.showError(
+          context,
+          title: 'Error',
+          message: 'Hubo un error al completar la cita.',
+          icon: '⚠️',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      await BookingActionDialog.showError(
+        context,
+        title: 'Error',
+        message: 'Error: $e',
+        icon: '⚠️',
       );
     }
   }
 
   Future<void> _cancelBooking(String bookingId) async {
-    // Encontrar la info de la reserva para mostrar en el diálogo
-    final booking = _bookings.firstWhere((b) => b['_id'] == bookingId, orElse: () => {});
-    final clientName = booking['clientName'] ?? 'Cliente';
-    
-    final motivo = await showDialog<String>(
-      context: context,
-      builder: (context) => CancelBookingDialog(
-        bookingInfo: clientName,
-        isStylista: true,
-      ),
-    );
-    
-    if (motivo != null && motivo.isNotEmpty) {
-      try {
-        final response = await _api.cancelBooking(bookingId, widget.token, motivo: motivo);
-          if (response.statusCode == 200) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Reserva cancelada'), backgroundColor: Colors.green),
-            );
-            await _loadBookings();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error al cancelar'), backgroundColor: Colors.red),
-            );
-          }
-        } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    try {
+      print('🔴 [CANCEL] Iniciando cancelación de cita: $bookingId');
+      
+      // Encontrar la info de la reserva para mostrar en el diálogo
+      final booking = _bookings.firstWhere((b) => b['_id'] == bookingId, orElse: () => {});
+      final clientName = booking['clienteNombre'] ?? 'Cliente';
+      
+      // Opciones precargadas de motivos
+      const List<String> motivosPrecargados = [
+        'Día de cumpleaños',
+        'Mal de salud',
+        'Calamidad doméstica',
+        'Problema de transporte',
+      ];
+      
+      // Mostrar diálogo para ingresar el motivo de cancelación
+      final motivo = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          final motivoController = TextEditingController();
+          String? selectedMotivo;
+          
+          return StatefulBuilder(
+            builder: (context, setState) => AlertDialog(
+              title: Text(
+                'Cancelar cita de $clientName',
+                style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: AppColors.charcoal,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Selecciona o escribe el motivo:',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    SizedBox(height: 12),
+                    
+                    // Opciones rápidas
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: motivosPrecargados.map((motiv) {
+                        final isSelected = selectedMotivo == motiv;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              selectedMotivo = isSelected ? null : motiv;
+                              if (motiv != 'Otro') {
+                                motivoController.text = motiv;
+                              } else {
+                                motivoController.clear();
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.red.withOpacity(0.4)
+                                  : Colors.grey.shade800.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Colors.red
+                                    : Colors.grey.shade700,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              motiv,
+                              style: TextStyle(
+                                color: isSelected ? Colors.red.shade200 : Colors.white70,
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    
+                    SizedBox(height: 16),
+                    
+                    // Campo de texto para motivo personalizado
+                    TextField(
+                      controller: motivoController,
+                      style: TextStyle(color: Colors.white),
+                      minLines: 2,
+                      maxLines: 4,
+                      maxLength: 200,
+                      decoration: InputDecoration(
+                        hintText: 'O escribe tu propio motivo aquí...',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Colors.grey.shade800.withOpacity(0.5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey.shade700),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey.shade700),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.gold),
+                        ),
+                      ),
+                    ),
+                    
+                    SizedBox(height: 12),
+                    Text(
+                      'El cliente recibirá notificación con el motivo.',
+                      style: TextStyle(color: Colors.orange.shade300, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancelar', style: TextStyle(color: Colors.white70)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (motivoController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Por favor, selecciona o escribe un motivo'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, motivoController.text.trim());
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                  child: Text('✕ Cancelar cita'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      
+      if (motivo == null || motivo.isEmpty) {
+        print('ℹ️  [CANCEL] Usuario canceló la operación de cancelación');
+        return;
+      }
+
+      print('   Motivo: $motivo');
+      print('   Token: ${widget.token.substring(0, 20)}...');
+      
+      final response = await _api.cancelBooking(bookingId, widget.token, motivo: motivo);
+      print('📥 [CANCEL] Response status: ${response.statusCode}');
+      print('📥 [CANCEL] Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ [CANCEL] Cita cancelada exitosamente');
+        
+        // Mostrar pop-up de éxito
+        await BookingActionDialog.showSuccess(
+          context,
+          title: '✕ ¡Cancelada!',
+          message: 'La cita ha sido cancelada exitosamente.\nEl cliente recibirá notificación.',
+          icon: '✕',
+          duration: Duration(seconds: 3),
+        );
+        
+        // Recargar las citas
+        await _loadBookings();
+        // Cambiar automáticamente al tab de "Canceladas"
+        if (mounted) {
+          setState(() => _filterStatus = 'CANCELLED');
+        }
+      } else if (response.statusCode == 400) {
+        print('❌ [CANCEL] Error 400 - Solicitud inválida');
+        print('   Body: ${response.body}');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Error',
+          message: 'La cita no puede ser cancelada en este momento.',
+          icon: '❌',
+        );
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        print('❌ [CANCEL] Error ${response.statusCode} - No autorizado');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Sesión Expirada',
+          message: 'Por favor, inicia sesión nuevamente.',
+          icon: '🔒',
+        );
+      } else if (response.statusCode == 404) {
+        print('❌ [CANCEL] Error 404 - Cita no encontrada');
+        await BookingActionDialog.showError(
+          context,
+          title: 'No Encontrada',
+          message: 'La cita no fue encontrada en el sistema.',
+          icon: '❓',
+        );
+      } else {
+        print('❌ [CANCEL] Error ${response.statusCode}');
+        await BookingActionDialog.showError(
+          context,
+          title: 'Error',
+          message: 'Hubo un error al cancelar la cita (${response.statusCode})',
+          icon: '⚠️',
         );
       }
+    } catch (e, st) {
+      print('❌ [CANCEL] Excepción: $e');
+      print('   Stack: $st');
+      await BookingActionDialog.showError(
+        context,
+        title: 'Error',
+        message: 'Error: $e',
+        icon: '⚠️',
+      );
     }
   }
 
@@ -324,8 +620,6 @@ class _StylistBookingsTabState extends State<StylistBookingsTab> {
                   child: Row(
                     children: [
                       _buildStatusChip('PENDING_STYLIST_CONFIRMATION', '🔔 Por confirmar', Colors.orange),
-                      SizedBox(width: 10),
-                      _buildStatusChip('SCHEDULED', '⏳ Pendientes', Colors.amber),
                       SizedBox(width: 10),
                       _buildStatusChip('CONFIRMED', '✓ Confirmadas', Colors.blue),
                       SizedBox(width: 10),

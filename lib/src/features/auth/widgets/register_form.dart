@@ -5,7 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/validators.dart';
 import '../../../utils/validators.dart' as form_validators;
-import '../dialogs/verify_email_dialog.dart';
 import 'auth_message_dialog.dart';
 
 class RegisterForm extends StatefulWidget {
@@ -124,23 +123,26 @@ class _RegisterFormState extends State<RegisterForm> {
               items: const [
                 DropdownMenuItem(value: 'M', child: Text('Género: Masculino')),
                 DropdownMenuItem(value: 'F', child: Text('Género: Femenino')),
+                DropdownMenuItem(value: 'O', child: Text('Género: Otro')),
               ],
               onChanged: (v) => setState(() => _genero = v ?? 'M'),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: AppColors.charcoal,
                 labelText: 'Género',
-                labelStyle: const TextStyle(color: Color.fromARGB(255, 221, 221, 221)),
+                labelStyle: const TextStyle(color: AppColors.gold, fontSize: 14, fontWeight: FontWeight.w500),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color.fromARGB(255, 247, 247, 247)),
+                  borderSide: const BorderSide(color: AppColors.gold, width: 1.2),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.gold, width: 1.4),
+                  borderSide: const BorderSide(color: AppColors.gold, width: 1.8),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               ),
+              dropdownColor: AppColors.charcoal,
+              style: const TextStyle(color: AppColors.gold, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
             CustomInputField(
@@ -281,21 +283,24 @@ class _RegisterFormState extends State<RegisterForm> {
                                     ),
                                     const SizedBox(height: 16),
                                     const Text('¡Registro exitoso!', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Por favor verifica tu correo electrónico para poder iniciar sesión',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: AppColors.gold, fontSize: 14, fontWeight: FontWeight.w500),
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
                           );
-                          Future.delayed(const Duration(seconds: 2), () {
+                          Future.delayed(const Duration(seconds: 4), () {
                             if (mounted) {
-                              Navigator.of(context).pop();
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => VerifyEmailDialog(
-                                  email: _correoCtrl.text.trim(),
-                                  token: token,
-                                ),
+                              Navigator.of(context).pop(); // Cierra el diálogo de éxito
+                              // Redirigir al login
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/login',
+                                (route) => false, // Elimina todas las rutas previas
                               );
                             }
                           });

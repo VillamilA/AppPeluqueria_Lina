@@ -31,7 +31,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
   late TextEditingController emailCtrl;
   late TextEditingController passwordCtrl;
   late TextEditingController confirmPasswordCtrl;
-  late TextEditingController edadCtrl;
   late String selectedGender;
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
@@ -76,7 +75,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
       // En edición NO precargar password
       passwordCtrl = TextEditingController(text: widget.isEdit ? '' : (widget.stylist?['password']?.toString() ?? ''));
       confirmPasswordCtrl = TextEditingController(text: '');
-      edadCtrl = TextEditingController(text: widget.stylist?['edad']?.toString() ?? '');
       selectedGender = widget.stylist?['genero']?.toString() ?? 'F';
       
       // Catalogs are now managed in a separate page (stylist_catalogs_page.dart)
@@ -103,7 +101,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
     emailCtrl.dispose();
     passwordCtrl.dispose();
     confirmPasswordCtrl.dispose();
-    edadCtrl.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -136,7 +133,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
     print('📋 nombreCtrl: "${nombreCtrl.text}" (${nombreCtrl.text.runtimeType})');
     print('📋 apellidoCtrl: "${apellidoCtrl.text}" (${apellidoCtrl.text.runtimeType})');
     print('📋 emailCtrl: "${emailCtrl.text}" (${emailCtrl.text.runtimeType})');
-    print('📋 edadCtrl: "${edadCtrl.text}" (${edadCtrl.text.runtimeType})');
     print('📋 selectedGender: "$selectedGender" (${selectedGender.runtimeType})');
     print('📋 passwordCtrl: "${passwordCtrl.text.isNotEmpty ? '***' : 'EMPTY'}" (${passwordCtrl.text.runtimeType})');
     print('📋 Note: Catalogs are managed separately in StylistCatalogsPage');
@@ -146,7 +142,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
       'apellido': apellidoCtrl.text,
       'cedula': cedulaCtrl.text,
       'telefono': telefonoCtrl.text,
-      'edad': int.tryParse(edadCtrl.text) ?? 0,
       'genero': selectedGender,
       // Solo incluir password si no está vacío o si estamos creando
       if (!widget.isEdit || passwordCtrl.text.isNotEmpty)
@@ -268,8 +263,6 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
                         SizedBox(height: 12),
                         _buildTextField(cedulaCtrl, 'Cédula', Icons.credit_card),
                         SizedBox(height: 12),
-                        _buildTextField(edadCtrl, 'Edad', Icons.calendar_today),
-                        SizedBox(height: 12),
                         _buildTextField(telefonoCtrl, 'Teléfono', Icons.phone),
                         SizedBox(height: 12),
                         Text(
@@ -346,12 +339,25 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
+                            final stylistId = widget.stylist!['_id']?.toString() ?? 
+                                             widget.stylist!['id']?.toString() ?? '';
+                            
+                            if (stylistId.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: ID del estilista no encontrado'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+                            
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => StylistCatalogsPage(
                                   token: widget.token,
-                                  stylistId: widget.stylist!['id'],
+                                  stylistId: stylistId,
                                   stylistName: '${nombreCtrl.text} ${apellidoCtrl.text}',
                                 ),
                               ),

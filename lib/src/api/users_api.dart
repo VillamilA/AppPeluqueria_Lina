@@ -98,10 +98,17 @@ class UsersApi {
   }
 
   Future<http.Response> updateMyProfile(Map<String, dynamic> data, String token) async {
+    print('✏️ UsersApi.updateMyProfile:');
+    print('  - Endpoint: PUT /api/v1/users/me');
+    print('  - Data keys: ${data.keys.join(", ")}');
+    
     return await _client.put(
       '/api/v1/users/me',
-      body: data,
-      headers: {'Authorization': 'Bearer $token'},
+      body: jsonEncode(data),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
     );
   }
 

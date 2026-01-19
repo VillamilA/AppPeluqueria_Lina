@@ -42,11 +42,19 @@ class StylistBookingsApi {
 
   /// Cancelar una reserva con motivo (POST /api/v1/bookings/{bookingId}/cancel)
   /// Body: { motivo: string }
-  /// Nota: Cliente tiene regla de 12 horas (congelación de cuenta si cancela tarde)
-  Future<http.Response> cancelBooking(String bookingId, String token, {String? motivo}) async =>
+  /// El estilista puede cancelar en cualquier momento
+  /// La cita debe estar en PENDING_STYLIST_CONFIRMATION o CONFIRMED
+  Future<http.Response> cancelBooking(
+    String bookingId,
+    String token, {
+    required String motivo,
+  }) async =>
       await _client.post(
         '/api/v1/bookings/$bookingId/cancel',
-        headers: {'Authorization': 'Bearer $token'},
-        body: motivo != null ? jsonEncode({'motivo': motivo}) : null,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'motivo': motivo}),
       );
 }

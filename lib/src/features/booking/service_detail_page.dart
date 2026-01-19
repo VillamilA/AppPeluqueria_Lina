@@ -308,11 +308,14 @@ class _ServiceDetailPageState extends State<ServiceDetailPage>
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop(); // Cerrar diálogo
+                    // Redirigir automáticamente al dashboard del cliente
                     Future.delayed(const Duration(milliseconds: 300), () {
                       if (mounted) {
-                        // Regresar al dashboard (2 pops: página de servicio + página anterior)
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pop();
+                        // Navegar al dashboard y limpiar el stack
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/dashboard',
+                          (route) => false,
+                        );
                       }
                     });
                   },

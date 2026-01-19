@@ -25,10 +25,36 @@ class AuthService {
       Uri.parse(url),
       body: data.map((k, v) => MapEntry(k, v.toString())),
     );
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final result = json.decode(response.body);
+      
+      // Enviar email de verificación automáticamente después del registro
+      try {
+        print('📧 Enviando email de verificación a ${data['email']}...');
+        await sendVerificationEmail(data['email']);
+        print('✅ Email de verificación enviado correctamente');
+      } catch (e) {
+        print('⚠️ Error al enviar email de verificación: $e');
+        // No lanzamos error para que el registro se complete
+      }
+      
+      return result;
     } else {
       throw Exception('Error en el registro: ${response.body}');
+    }
+  }
+
+  /// Envía el email de verificación
+  Future<void> sendVerificationEmail(String email) async {
+    final url = '${dotenv.env['API_BASE_URL']}/api/v1/auth/send-verification-email';
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Error al enviar email de verificación');
     }
   }
 

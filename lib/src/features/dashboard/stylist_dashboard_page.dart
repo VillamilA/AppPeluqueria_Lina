@@ -28,13 +28,22 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadStylistData();
+    _slotsApi = SlotsApi(ApiClient.instance);
+  }
+
+  void _loadStylistData() {
     _token = widget.user['accessToken'] ?? widget.user['token'] ?? '';
     _stylistId = widget.user['id'] ?? '';
     _stylistName = widget.user['nombre'] ?? 'Estilista';
     _stylistLastName = widget.user['apellido'] ?? '';
     _stylistEmail = widget.user['email'] ?? '';
     _stylistPhone = widget.user['telefono'] ?? '';
-    _slotsApi = SlotsApi(ApiClient.instance);
+    print('🔄 Datos estilista cargados en dashboard');
+    print('  - Nombre: $_stylistName');
+    print('  - Apellido: $_stylistLastName');
+    print('  - Email: $_stylistEmail');
+    print('  - Teléfono: $_stylistPhone');
   }
 
   @override
@@ -147,6 +156,7 @@ class _StylistDashboardPageState extends State<StylistDashboardPage> {
       stylistId: _stylistId,
       token: _token,
       slotsApi: _slotsApi,
+      stylistData: widget.user,
     );
   }
 }

@@ -118,4 +118,64 @@ class CatalogsApi {
         '/api/v1/catalog/$catalogId/deactivate',
         headers: {'Authorization': 'Bearer $token'},
       );
+
+  /// Agregar servicios a un catálogo (POST /api/v1/catalog/:id/services/add)
+  Future<http.Response> addServicesToCatalog({
+    required String catalogId,
+    required List<String> serviceIds,
+    required String token,
+  }) async {
+    final body = {
+      'services': serviceIds,
+    };
+
+    return await _client.post(
+      '/api/v1/catalog/$catalogId/services/add',
+      body: jsonEncode(body),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+  }
+
+  /// Quitar servicios de un catálogo (POST /api/v1/catalog/:id/services/remove)
+  Future<http.Response> removeServicesFromCatalog({
+    required String catalogId,
+    required List<String> serviceIds,
+    required String token,
+  }) async {
+    final body = {
+      'services': serviceIds,
+    };
+
+    return await _client.post(
+      '/api/v1/catalog/$catalogId/services/remove',
+      body: jsonEncode(body),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+  }
+
+  /// Reemplazar lista de servicios en un catálogo (PUT /api/v1/catalog/:id/services)
+  Future<http.Response> replaceServicesInCatalog({
+    required String catalogId,
+    required List<String> serviceIds,
+    required String token,
+  }) async {
+    final body = {
+      'services': serviceIds,
+    };
+
+    return await _client.put(
+      '/api/v1/catalog/$catalogId/services',
+      body: jsonEncode(body),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+  }
 }

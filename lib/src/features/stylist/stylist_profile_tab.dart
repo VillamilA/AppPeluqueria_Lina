@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../core/theme/app_theme.dart';
 import '../../api/slots_api.dart';
+import '../../api/api_client.dart';
 import '../../data/services/token_storage.dart';
 import '../../services/session_manager.dart';
 import '../slots/schedule_hub_page.dart';
 import '../profile/pages/change_password_page.dart';
+import 'widgets/edit_stylist_profile_section.dart';
 
-class StylistProfileTab extends StatelessWidget {
+class StylistProfileTab extends StatefulWidget {
   final String stylistName;
   final String stylistLastName;
   final String stylistEmail;
@@ -15,6 +18,7 @@ class StylistProfileTab extends StatelessWidget {
   final String? stylistId;
   final String? token;
   final SlotsApi? slotsApi;
+  final Map<String, dynamic>? stylistData; // Datos completos del estilista
 
   const StylistProfileTab({
     super.key,
@@ -26,7 +30,74 @@ class StylistProfileTab extends StatelessWidget {
     this.stylistId,
     this.token,
     this.slotsApi,
+    this.stylistData,
   });
+
+  @override
+  State<StylistProfileTab> createState() => _StylistProfileTabState();
+}
+
+class _StylistProfileTabState extends State<StylistProfileTab> {
+  late String stylistName;
+  late String stylistLastName;
+  late String stylistEmail;
+  late String stylistPhone;
+  late String? stylistId;
+  late String? token;
+  late SlotsApi? slotsApi;
+  late Map<String, dynamic>? stylistData;
+
+  @override
+  void initState() {
+    super.initState();
+    // Copiar datos iniciales
+    stylistName = widget.stylistName;
+    stylistLastName = widget.stylistLastName;
+    stylistEmail = widget.stylistEmail;
+    stylistPhone = widget.stylistPhone;
+    stylistId = widget.stylistId;
+    token = widget.token;
+    slotsApi = widget.slotsApi;
+    stylistData = widget.stylistData;
+  }
+
+  Future<void> _reloadProfileFromAPI() async {
+    if (token == null || token!.isEmpty) {
+      print('❌ No token available para recargar perfil');
+      return;
+    }
+
+    try {
+      print('🔄 Recargando perfil desde API...');
+      
+      final response = await ApiClient.instance.get(
+        '/api/v1/users/me',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final user = json['data'] ?? json;
+        
+        setState(() {
+          stylistName = user['nombre'] ?? stylistName;
+          stylistLastName = user['apellido'] ?? stylistLastName;
+          stylistEmail = user['email'] ?? stylistEmail;
+          stylistPhone = user['telefono'] ?? stylistPhone;
+          stylistData = {...?stylistData, ...user};
+          
+          print('✅ Perfil recargado correctamente');
+          print('  - Nombre: $stylistName');
+          print('  - Apellido: $stylistLastName');
+          print('  - Teléfono: $stylistPhone');
+        });
+      } else {
+        print('❌ Error recargando perfil: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error al recargar perfil: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,37 +166,46 @@ class StylistProfileTab extends StatelessWidget {
   }
 
   Widget _buildProfileCard() {
-    final Color roleColor = AppColors.gold; // Color dorado del negocio
+    final Color roleColor = AppColors.gold; // Color dorado
 
     return Container(
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.grey.shade900, AppColors.charcoal],
+          colors: [
+            AppColors.charcoal,
+            AppColors.charcoal.withOpacity(0.8),
+          ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: roleColor.withOpacity(0.3), width: 2),
+        border: Border.all(
+          color: roleColor.withOpacity(0.3),
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: roleColor.withOpacity(0.15),
+            color: roleColor.withOpacity(0.2),
             blurRadius: 20,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Header con rol
+          // Encabezado con rol y icono
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
               gradient: LinearGradient(
-                colors: [roleColor.withOpacity(0.2), roleColor.withOpacity(0.05)],
+                colors: [
+                  roleColor.withOpacity(0.2),
+                  roleColor.withOpacity(0.1),
+                ],
               ),
             ),
             child: Row(
@@ -134,18 +214,22 @@ class StylistProfileTab extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: roleColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.cut, color: roleColor, size: 22),
+                      child: Icon(
+                        Icons.cut,
+                        color: roleColor,
+                        size: 20,
+                      ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Text(
-                      'Estilista Profesional',
+                      'Estilista',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: roleColor,
                         letterSpacing: 0.5,
@@ -154,26 +238,19 @@ class StylistProfileTab extends StatelessWidget {
                   ],
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
+                    color: roleColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.green.withOpacity(0.4)),
+                    border: Border.all(color: roleColor.withOpacity(0.3)),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, color: Colors.green, size: 14),
-                      SizedBox(width: 6),
-                      Text(
-                        'Activo',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
+                  child: const Text(
+                    'Perfil Verificado',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
                   ),
                 ),
               ],
@@ -182,7 +259,7 @@ class StylistProfileTab extends StatelessWidget {
 
           // Avatar y nombre
           Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.only(top: 24, bottom: 16, left: 20, right: 20),
             child: Column(
               children: [
                 // Avatar
@@ -194,100 +271,188 @@ class StylistProfileTab extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [roleColor, roleColor.withOpacity(0.6)],
+                      colors: [
+                        roleColor,
+                        roleColor.withOpacity(0.7),
+                      ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: roleColor.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: Offset(0, 8),
+                        color: roleColor.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
                   child: Center(
                     child: Text(
                       '${stylistName.isNotEmpty ? stylistName[0] : ''}${stylistLastName.isNotEmpty ? stylistLastName[0] : ''}',
-                      style: TextStyle(
-                        fontSize: 40,
+                      style: const TextStyle(
+                        fontSize: 44,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: AppColors.charcoal,
                       ),
                     ),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-                // Nombre
+                // Nombre completo
                 Text(
                   '$stylistName $stylistLastName',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 // Email
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.email_outlined, color: AppColors.gray, size: 16),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        stylistEmail,
-                        style: TextStyle(color: AppColors.gray, fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  stylistEmail,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Info grid
+          // Información de contacto
           Container(
-            margin: EdgeInsets.fromLTRB(16, 0, 16, 24),
-            padding: EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: roleColor.withOpacity(0.15)),
+              color: roleColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: roleColor.withOpacity(0.15),
+              ),
             ),
-            child: Row(
+            child: Column(
               children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: roleColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.phone_outlined, color: roleColor, size: 20),
+                // Teléfono
+                _buildInfoItem(
+                  icon: Icons.phone,
+                  label: 'Teléfono',
+                  value: stylistPhone,
+                  color: roleColor,
                 ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Teléfono', style: TextStyle(color: AppColors.gray, fontSize: 12)),
-                      SizedBox(height: 2),
-                      Text(
-                        stylistPhone,
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Divider(
+                  color: roleColor.withOpacity(0.2),
+                  height: 1,
+                ),
+                const SizedBox(height: 12),
+
+                // Género
+                _buildInfoItem(
+                  icon: Icons.person_outline,
+                  label: 'Género',
+                  value: _getGeneroLabel(),
+                  color: roleColor,
+                  isCompact: true,
+                ),
+              ],
+            ),
+          ),
+
+          // Espaciador
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    bool isCompact = false,
+  }) {
+    if (isCompact) {
+      return Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
         ],
-      ),
+      );
+    }
+
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
+  }
+
+  String _getGeneroLabel() {
+    if (stylistData == null) return 'Otro';
+    final genero = stylistData!['genero'] ?? 'O';
+    switch (genero) {
+      case 'M':
+        return 'Masculino';
+      case 'F':
+        return 'Femenino';
+      default:
+        return 'Otro';
+    }
   }
 
   Widget _buildOptionsSection(BuildContext context, {required bool isCompact}) {
@@ -352,9 +517,7 @@ class StylistProfileTab extends StatelessWidget {
           title: 'Editar Perfil',
           subtitle: 'Actualiza tu información',
           color: Colors.grey.shade600,
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
-          ),
+          onTap: () => _navigateToEditProfile(context),
         ),
         SizedBox(height: 12),
         _buildOptionCard(
@@ -391,9 +554,7 @@ class StylistProfileTab extends StatelessWidget {
             title: 'Editar Perfil',
             subtitle: 'Tus datos',
             color: Colors.grey.shade600,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Próximamente'), backgroundColor: Colors.blue),
-            ),
+            onTap: () => _navigateToEditProfile(context),
             isGridItem: true,
           ),
         ),
@@ -646,6 +807,93 @@ class StylistProfileTab extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => ChangePasswordPage(token: token!),
+      ),
+    );
+  }
+
+  void _navigateToEditProfile(BuildContext context) {
+    if (token == null || stylistData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: Datos insuficientes'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    print('🟦 StylistProfileTab._navigateToEditProfile called');
+    print('  - token exists: true');
+    print('  - stylistData exists: true');
+    print('  - Datos: ${stylistData!.keys.toList()}');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditStylistProfilePage(
+          token: token!,
+          stylist: stylistData!,
+          onSuccess: () {
+            print('✅ Perfil actualizado en backend');
+            // Recargar perfil desde la API
+            _reloadProfileFromAPI();
+          },
+        ),
+      ),
+    ).then((result) {
+      print('🔄 Regresando de EditStylistProfilePage...');
+      // Recargar nuevamente por si acaso
+      _reloadProfileFromAPI();
+    });
+  }
+}
+
+// ===== PÁGINA DE EDICIÓN DE PERFIL =====
+class EditStylistProfilePage extends StatefulWidget {
+  final String token;
+  final Map<String, dynamic> stylist;
+  final VoidCallback? onSuccess;
+
+  const EditStylistProfilePage({
+    super.key,
+    required this.token,
+    required this.stylist,
+    this.onSuccess,
+  });
+
+  @override
+  State<EditStylistProfilePage> createState() => _EditStylistProfilePageState();
+}
+
+class _EditStylistProfilePageState extends State<EditStylistProfilePage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.charcoal,
+      appBar: AppBar(
+        backgroundColor: AppColors.charcoal,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.gold),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        centerTitle: true,
+        title: const Text(
+          'Editar Perfil',
+          style: TextStyle(
+            color: AppColors.gold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: EditStylistProfileSection(
+          token: widget.token,
+          stylist: widget.stylist,
+          onSuccess: widget.onSuccess,
+        ),
       ),
     );
   }

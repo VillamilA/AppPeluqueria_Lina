@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:peluqueria_lina_app/src/features/booking/services_booking_page.dart';
 import 'package:peluqueria_lina_app/src/features/dashboard/my_bookings_tab.dart';
-import 'package:peluqueria_lina_app/src/features/dashboard/stylist_detail_page.dart';
 import 'package:peluqueria_lina_app/src/api/api_client.dart';
 import 'package:peluqueria_lina_app/src/data/services/token_storage.dart';
 import 'package:peluqueria_lina_app/src/api/catalog_api.dart';
@@ -930,114 +929,8 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
             
             // Location Card
             LocationCard(isCompact: false),
-            
-            SizedBox(height: 20),
-            
-            // Info compacta en grid
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.access_time,
-                    title: 'Horario',
-                    items: [
-                      'L-V: 8:00 - 18:00',
-                      'Sáb: 9:00 - 16:00',
-                      'Dom: Cerrado',
-                    ],
-                  ),
-                ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.phone,
-                    title: 'Contacto',
-                    items: [
-                      '+593 2 XXX XXXX',
-                      '+593 9XX XXX XXX',
-                      'info@peluquerialina.com',
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required List<String> items,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.grey.shade900,
-            Colors.black87,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.2), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: AppColors.gold, size: 20),
-              ),
-              SizedBox(width: 10),
-              Text(
-                title,
-                style: TextStyle(
-                  color: AppColors.gold,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 14),
-          ...items.map((item) => Padding(
-            padding: EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.gray,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )),
-        ],
       ),
     );
   }
@@ -1060,21 +953,9 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     final rating = (stylist['rating'] ?? 5.0).toDouble();
     final especialidad = stylist['especialidad'] ?? 'Estilista';
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StylistDetailPage(
-              stylist: stylist,
-              token: token,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        width: 160,
-        decoration: BoxDecoration(
+    return Container(
+      width: 160,
+      decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -1186,7 +1067,6 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
             SizedBox(height: 12),
           ],
         ),
-      ),
     );
   }
 

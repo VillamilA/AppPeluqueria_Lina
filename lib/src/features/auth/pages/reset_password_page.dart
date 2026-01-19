@@ -3,6 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/services/auth_service.dart';
 import '../widgets/auth_message_dialog.dart';
+import 'dart:async';
 
 /// Página para restablecer contraseña con código de recuperación
 class ResetPasswordPage extends StatefulWidget {
@@ -25,13 +26,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _loading = false;
+  bool _isResendingCode = false;
   String? _codeError; // Para mostrar error del código
+  bool _showResendButton = false; // Mostrar botón de reenviar cuando código es incorrecto
+  int _resendCooldownSeconds = 0; // Cooldown de 90 segundos para reenviar
+  Timer? _resendCooldownTimer; // Timer para el cooldown
 
   @override
   void dispose() {
     _codeCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _resendCooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -44,6 +50,76 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       'number': RegExp(r'\d').hasMatch(password),
       'special': RegExp(r'[^a-zA-Z0-9\s]').hasMatch(password), // ✅ CARÁCTER ESPECIAL (cualquier símbolo)
     };
+  }
+
+  /// Reenvía el código de recuperación
+  Future<void> _resendCode() async {
+    // Validar cooldown
+    if (_resendCooldownSeconds > 0) {
+      await AuthMessageDialog.showAuto(
+        context,
+        type: MessageType.warning,
+        title: 'Espera un momento',
+        message: 'Por favor espera $_resendCooldownSeconds segundos antes de reenviar otro código',
+        seconds: 3,
+      );
+      return;
+    }
+
+    setState(() => _isResendingCode = true);
+
+    try {
+      await AuthService.forgotPassword(widget.email);
+
+      if (mounted) {
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.success,
+          title: 'Código Reenviado',
+          message: 'Se ha enviado un nuevo código a tu correo: ${widget.email}',
+          seconds: 3,
+        );
+        
+        setState(() {
+          _codeError = null;
+          _showResendButton = false;
+          _codeCtrl.clear();
+        });
+        
+        // Iniciar cooldown de 90 segundos
+        _startResendCooldown();
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMsg = e.toString();
+        await AuthMessageDialog.showAuto(
+          context,
+          type: MessageType.error,
+          title: 'Error al Reenviar',
+          message: errorMsg.replaceFirst('Exception: ', ''),
+          seconds: 3,
+        );
+      }
+    } finally {
+      setState(() => _isResendingCode = false);
+    }
+  }
+
+  /// Inicia el cooldown de 90 segundos para reenviar código
+  void _startResendCooldown() {
+    _resendCooldownTimer?.cancel();
+    setState(() {
+      _resendCooldownSeconds = 90;
+    });
+
+    _resendCooldownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _resendCooldownSeconds--;
+      });
+      if (_resendCooldownSeconds <= 0) {
+        timer.cancel();
+      }
+    });
   }
 
   /// Restablece la contraseña
@@ -90,6 +166,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       color: AppColors.gold,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ],
@@ -139,7 +216,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
       // ✅ DIFERENCIAR ERRORES DE CÓDIGO
       if (errorMsg.contains('expirado')) {
-        setState(() => _codeError = '❌ Código expirado. Solicita uno nuevo.');
+        setState(() {
+          _codeError = '❌ Código expirado. Solicita uno nuevo.';
+          _showResendButton = true; // Mostrar botón de reenviar
+        });
         // Mostrar alerta prominente
         await AuthMessageDialog.showAuto(
           context,
@@ -149,7 +229,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           seconds: 4,
         );
       } else if (errorMsg.contains('incorrecto')) {
-        setState(() => _codeError = '❌ Código incorrecto. Verifica y intenta de nuevo.');
+        setState(() {
+          _codeError = '❌ Código incorrecto. Verifica y intenta de nuevo.';
+          _showResendButton = true; // Mostrar botón de reenviar
+        });
         // Mostrar alerta prominente para código incorrecto
         await AuthMessageDialog.showAuto(
           context,
@@ -246,39 +329,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Email mostrado
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.gold.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.email,
-                            size: 20,
-                            color: AppColors.gold,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Para: ${widget.email}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.gray,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
                     // ✅ CAMPO CÓDIGO DE RECUPERACIÓN
                     TextFormField(
                       controller: _codeCtrl,
@@ -319,6 +369,89 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         }
                       },
                     ),
+                    const SizedBox(height: 8),
+                    // Advertencia recordando donde se envió el código
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.gold.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppColors.gold,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Recuerda: el código se envió a tu correo (${widget.email})',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Botón de reenviar código cuando hay error
+                    if (_showResendButton)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _isResendingCode || _resendCooldownSeconds > 0 ? null : _resendCode,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _resendCooldownSeconds > 0 
+                                  ? AppColors.gold.withOpacity(0.1)
+                                  : AppColors.gold.withOpacity(0.2),
+                              foregroundColor: AppColors.gold,
+                              side: BorderSide(
+                                color: _resendCooldownSeconds > 0 
+                                    ? AppColors.gold.withOpacity(0.3)
+                                    : AppColors.gold,
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            icon: _isResendingCode
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.gold,
+                                    ),
+                                  )
+                                : Icon(
+                                    _resendCooldownSeconds > 0 
+                                        ? Icons.schedule 
+                                        : Icons.mail_outline,
+                                    size: 18,
+                                  ),
+                            label: Text(
+                              _isResendingCode 
+                                  ? 'Reenviando...'
+                                  : _resendCooldownSeconds > 0
+                                  ? 'Espera $_resendCooldownSeconds segundos'
+                                  : 'Reenviar Código',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 20),
 
                     // Campo Nueva Contraseña

@@ -54,23 +54,48 @@ class _CatalogFormPageState extends State<CatalogFormPage> with SingleTickerProv
   }
 
   Future<void> _save() async {
+    // Validar nombre (solo letras y espacios)
     if (nombreCtrl.text.isEmpty) {
       _showErrorSnack('El nombre es requerido');
       return;
+    }
+    
+    final nombreRegex = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$');
+    if (!nombreRegex.hasMatch(nombreCtrl.text)) {
+      _showErrorSnack('El nombre solo puede contener letras y espacios');
+      return;
+    }
+
+    // Validar descripción (máximo 150 caracteres)
+    if (descripcionCtrl.text.length > 150) {
+      _showErrorSnack('La descripción no puede exceder 150 caracteres');
+      return;
+    }
+
+    // Validar URL de imagen (si se proporciona)
+    if (imageUrlCtrl.text.isNotEmpty) {
+      final urlRegex = RegExp(
+        r'^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$',
+        caseSensitive: false,
+      );
+      if (!urlRegex.hasMatch(imageUrlCtrl.text)) {
+        _showErrorSnack('La URL de imagen no es válida');
+        return;
+      }
     }
 
     setState(() => isSaving = true);
 
     final data = <String, dynamic>{
-      'nombre': nombreCtrl.text,
+      'nombre': nombreCtrl.text.trim(),
     };
 
     if (descripcionCtrl.text.isNotEmpty) {
-      data['descripcion'] = descripcionCtrl.text;
+      data['descripcion'] = descripcionCtrl.text.trim();
     }
 
     if (imageUrlCtrl.text.isNotEmpty) {
-      data['imageUrl'] = imageUrlCtrl.text;
+      data['imageUrl'] = imageUrlCtrl.text.trim();
     }
 
     if (!widget.isEdit) {
@@ -163,11 +188,28 @@ class _CatalogFormPageState extends State<CatalogFormPage> with SingleTickerProv
                           ],
                         ),
                         SizedBox(height: 16),
-                        _buildTextField(nombreCtrl, 'Nombre del Catálogo *', Icons.label),
+                        _buildTextField(
+                          nombreCtrl, 
+                          'Nombre del Catálogo *', 
+                          Icons.label,
+                          helperText: 'Solo letras y espacios',
+                        ),
                         SizedBox(height: 12),
-                        _buildTextField(descripcionCtrl, 'Descripción (opcional)', Icons.description, maxLines: 3),
+                        _buildTextField(
+                          descripcionCtrl, 
+                          'Descripción (opcional)', 
+                          Icons.description, 
+                          maxLines: 3,
+                          maxLength: 150,
+                          helperText: '${descripcionCtrl.text.length}/150 caracteres',
+                        ),
                         SizedBox(height: 12),
-                        _buildTextField(imageUrlCtrl, 'URL de Imagen (opcional)', Icons.image),
+                        _buildTextField(
+                          imageUrlCtrl, 
+                          'URL de Imagen (opcional)', 
+                          Icons.image,
+                          helperText: 'Ejemplo: https://ejemplo.com/imagen.jpg',
+                        ),
                         if (!widget.isEdit) ...[
                           SizedBox(height: 16),
                           Container(
@@ -257,14 +299,24 @@ class _CatalogFormPageState extends State<CatalogFormPage> with SingleTickerProv
     String label,
     IconData icon, {
     int maxLines = 1,
+    int? maxLength,
+    String? helperText,
   }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
+      onChanged: (value) {
+        // Actualizar el estado para refrescar el contador de caracteres
+        setState(() {});
+      },
       style: TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+        helperText: helperText,
+        helperStyle: TextStyle(color: Colors.grey[500], fontSize: 12),
+        counterStyle: TextStyle(color: AppColors.gold.withOpacity(0.7), fontSize: 12),
         prefixIcon: Icon(icon, color: AppColors.gold.withOpacity(0.7), size: 20),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

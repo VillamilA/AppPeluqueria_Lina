@@ -19,6 +19,7 @@ Aplicación móvil completa de gestión para salón de belleza "Peluquería Lina
 - **Gestión de Citas**: Ver historial de reservas, cancelar o reagendar citas
 - **Selección Flexible**: Elegir estilista específico o cualquiera disponible
 - **Notificaciones**: Recordatorios automáticos de citas próximas
+- **Categorías de Servicios**: Explorar servicios organizados por categoría (ej: Cortes, Coloración, Tratamientos)
 
 ### Para Estilistas
 - **Dashboard Personalizado**: Ver citas del día, semana y estadísticas
@@ -28,6 +29,8 @@ Aplicación móvil completa de gestión para salón de belleza "Peluquería Lina
 
 ### Para Gerentes
 - **Administración Completa**: CRUD de servicios, estilistas, clientes y gerentes
+- **✨ Gestión de Servicios y Categorías**: Crear, editar, eliminar servicios y categorías
+- **✨ Relación Servicios-Categorías**: Gestionar qué servicios pertenecen a cada categoría
 - **Reportes**: Estadísticas de ingresos, ocupación y desempeño
 - **Validación de Datos**: Control de calidad en toda la información del sistema
 - **Gestión de Acceso**: Control de permisos por rol
