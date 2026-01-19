@@ -1,4 +1,44 @@
 /// Validadores para formularios de la aplicación
+
+/// Clase para validar requisitos de contraseña y obtener su estado
+class PasswordStrengthChecker {
+  static const minLength = 8;
+  static const specialChars = '.#\$%&@!*-_=+';
+  
+  /// Verifica si tiene mínimo 8 caracteres
+  static bool hasMinLength(String password) => password.length >= minLength;
+  
+  /// Verifica si tiene al menos una mayúscula
+  static bool hasUppercase(String password) => RegExp(r'[A-Z]').hasMatch(password);
+  
+  /// Verifica si tiene al menos una minúscula
+  static bool hasLowercase(String password) => RegExp(r'[a-z]').hasMatch(password);
+  
+  /// Verifica si tiene al menos un número
+  static bool hasNumber(String password) => RegExp(r'[0-9]').hasMatch(password);
+  
+  /// Verifica si tiene al menos un carácter especial
+  static bool hasSpecialChar(String password) => 
+    RegExp(r'[.#$%&@!*\-_=+]').hasMatch(password);
+  
+  /// Obtiene todos los requisitos y su estado
+  static Map<String, bool> getAllRequirements(String password) {
+    return {
+      '8 caracteres mínimo': hasMinLength(password),
+      'Una MAYÚSCULA': hasUppercase(password),
+      'Una minúscula': hasLowercase(password),
+      'Un número (0-9)': hasNumber(password),
+      'Carácter especial (.#\$%&@!*)': hasSpecialChar(password),
+    };
+  }
+  
+  /// Verifica si todos los requisitos se cumplen
+  static bool isValid(String password) {
+    final reqs = getAllRequirements(password);
+    return reqs.values.every((element) => element);
+  }
+}
+
 class FormValidators {
   /// Valida que un nombre sea válido (min 3 letras, solo letras y espacios)
   static String? validateName(String? value, String fieldName) {
@@ -127,24 +167,40 @@ class FormValidators {
     return null;
   }
 
-  /// Valida email
+  /// Valida email (estructura real)
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Email es requerido';
     }
     
+    value = value.trim();
+    
+    // Regex más estricto para emails reales
     final emailRegex = RegExp(
-      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+      r'^[a-zA-Z0-9][a-zA-Z0-9._%-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$',
     );
     
     if (!emailRegex.hasMatch(value)) {
       return 'Email inválido';
     }
     
+    // Validar que no sea un email trivial (a@a.com, test@test.com, etc)
+    final parts = value.split('@');
+    final localPart = parts[0];
+    final domain = parts[1].split('.')[0];
+    
+    if (localPart.length < 3) {
+      return 'Email: la parte antes de @ debe tener mínimo 3 caracteres';
+    }
+    
+    if (localPart == domain) {
+      return 'Email: debe ser una dirección válida';
+    }
+    
     return null;
   }
 
-  /// Valida teléfono (solo números, min 7 dígitos)
+  /// Valida teléfono (debe empezar con 09 y tener exactamente 10 dígitos)
   static String? validatePhone(String? value) {
     if (value == null || value.isEmpty) {
       return 'Teléfono es requerido';
@@ -152,33 +208,41 @@ class FormValidators {
     
     final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
     
-    if (digitsOnly.length < 7) {
-      return 'Teléfono debe tener al menos 7 dígitos';
+    if (digitsOnly.length != 10) {
+      return 'Teléfono debe tener exactamente 10 dígitos';
     }
     
-    if (digitsOnly.length > 15) {
-      return 'Teléfono es muy largo';
+    if (!digitsOnly.startsWith('09')) {
+      return 'Teléfono debe empezar con 09';
     }
     
     return null;
   }
 
-  /// Valida contraseña (min 6 caracteres, debe tener letras y números)
+  /// Valida contraseña (min 8 caracteres, mayúscula, minúscula, número y carácter especial)
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Contraseña es requerida';
     }
     
-    if (value.length < 6) {
-      return 'Contraseña debe tener mínimo 6 caracteres';
+    if (value.length < 8) {
+      return 'Contraseña debe tener mínimo 8 caracteres';
     }
     
     if (!RegExp(r'[0-9]').hasMatch(value)) {
       return 'Contraseña debe contener números';
     }
     
-    if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
-      return 'Contraseña debe contener letras';
+    if (!RegExp(r'[a-z]').hasMatch(value)) {
+      return 'Contraseña debe contener letras minúsculas';
+    }
+    
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Contraseña debe contener letras mayúsculas';
+    }
+    
+    if (!RegExp(r'[.#$%&@!*\-_=+]').hasMatch(value)) {
+      return 'Contraseña debe contener un carácter especial (.#\$%&@!*-_=+)';
     }
     
     return null;

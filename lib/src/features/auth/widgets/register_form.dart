@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:peluqueria_lina_app/src/widgets/custom_input_field.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../core/utils/validators.dart';
+import '../../../utils/validators.dart' as form_validators;
 import '../dialogs/verify_email_dialog.dart';
 import 'auth_message_dialog.dart';
 
@@ -24,6 +26,17 @@ class _RegisterFormState extends State<RegisterForm> {
   final _pass2Ctrl = TextEditingController();
   String _genero = 'M';
   bool _loading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  
+  // Para mostrar requisitos de contraseña
+  Map<String, bool> _passwordRequirements = {
+    '8 caracteres mínimo': false,
+    'Una MAYÚSCULA': false,
+    'Una minúscula': false,
+    'Un número (0-9)': false,
+    'Carácter especial (.#\$%&@!*)': false,
+  };
 
   @override
   void dispose() {
@@ -55,7 +68,13 @@ class _RegisterFormState extends State<RegisterForm> {
                     controller: _nombreCtrl,
                     label: 'Nombre',
                     textInputAction: TextInputAction.next,
-                    validator: Validators.nombre,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[a-záéíóúñA-ZÁÉÍÓÚÑ\s]'),
+                      ),
+                      LengthLimitingTextInputFormatter(30),
+                    ],
+                    validator: (v) => form_validators.FormValidators.validateName(v, 'Nombre'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -64,7 +83,13 @@ class _RegisterFormState extends State<RegisterForm> {
                     controller: _apellidoCtrl,
                     label: 'Apellido',
                     textInputAction: TextInputAction.next,
-                    validator: Validators.apellido,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[a-záéíóúñA-ZÁÉÍÓÚÑ\s]'),
+                      ),
+                      LengthLimitingTextInputFormatter(30),
+                    ],
+                    validator: (v) => form_validators.FormValidators.validateName(v, 'Apellido'),
                   ),
                 ),
               ],
@@ -75,15 +100,23 @@ class _RegisterFormState extends State<RegisterForm> {
               label: 'Cédula',
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.next,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
               validator: Validators.cedula,
             ),
             const SizedBox(height: 12),
             CustomInputField(
               controller: _telefonoCtrl,
-              label: 'Teléfono',
+              label: 'Teléfono (ej: 0987654321)',
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
-              validator: Validators.telefono,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              validator: form_validators.FormValidators.validatePhone,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -115,22 +148,75 @@ class _RegisterFormState extends State<RegisterForm> {
               label: 'Correo',
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
-              validator: Validators.email,
+              validator: form_validators.FormValidators.validateEmail,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            // Campo de contraseña con visualización de requisitos
             CustomInputField(
               controller: _passCtrl,
               label: 'Contraseña',
-              obscureText: true,
+              obscureText: _obscurePassword,
               textInputAction: TextInputAction.next,
-              validator: Validators.password,
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              onChanged: (_) => setState(() {
+                _passwordRequirements = form_validators.PasswordStrengthChecker.getAllRequirements(_passCtrl.text);
+              }),
+              validator: form_validators.FormValidators.validatePassword,
             ),
+            if (_passCtrl.text.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              // Mostrar requisitos de contraseña
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.charcoal,
+                  border: Border.all(
+                    color: AppColors.gold.withOpacity(0.3),
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _passwordRequirements.entries.map((entry) {
+                    final isMet = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isMet ? Icons.check_circle : Icons.cancel,
+                            color: isMet ? Colors.green : AppColors.gold.withOpacity(0.6),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            entry.key,
+                            style: TextStyle(
+                              color: isMet ? Colors.green : AppColors.gold.withOpacity(0.8),
+                              fontSize: 12,
+                              fontWeight: isMet ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             CustomInputField(
               controller: _pass2Ctrl,
               label: 'Confirmar contraseña',
-              obscureText: true,
+              obscureText: _obscureConfirm,
               textInputAction: TextInputAction.done,
+              suffixIcon: IconButton(
+                icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
               validator: (v) => v != _passCtrl.text ? 'Las contraseñas no coinciden' : null,
             ),
             const SizedBox(height: 20),
