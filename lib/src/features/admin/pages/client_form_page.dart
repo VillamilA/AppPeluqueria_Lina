@@ -33,6 +33,13 @@ class _ClientFormPageState extends State<ClientFormPage> with SingleTickerProvid
   bool isSaving = false;
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
+  Map<String, bool> _passwordRequirements = {
+    '8 caracteres mínimo': false,
+    'Una MAYÚSCULA': false,
+    'Una minúscula': false,
+    'Un número (0-9)': false,
+    'Carácter especial (@\$!%*?&)': false,
+  };
 
   @override
   void initState() {
@@ -285,7 +292,20 @@ class _ClientFormPageState extends State<ClientFormPage> with SingleTickerProvid
                           _buildTextField(emailCtrl, 'Email', Icons.email),
                           SizedBox(height: 12),
                         ],
-                        _buildTextField(passwordCtrl, widget.isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña', Icons.lock, isPassword: true),
+                        _buildPasswordField(
+                          passwordCtrl,
+                          widget.isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña',
+                          Icons.lock,
+                          onChanged: () {
+                            setState(() {
+                              _passwordRequirements = FormValidations.getPasswordRequirements(passwordCtrl.text);
+                            });
+                          },
+                        ),
+                        if (passwordCtrl.text.isNotEmpty) ...[
+                          SizedBox(height: 12),
+                          _buildPasswordRequirementsBox(),
+                        ],
                       ],
                     ),
                   ),
@@ -371,6 +391,75 @@ class _ClientFormPageState extends State<ClientFormPage> with SingleTickerProvid
         filled: true,
         fillColor: Colors.grey[850],
         contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    VoidCallback? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      keyboardType: TextInputType.text,
+      onChanged: (_) => onChanged?.call(),
+      style: TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+        prefixIcon: Icon(icon, color: AppColors.gold.withOpacity(0.7), size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.gold, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.grey[850],
+        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      ),
+    );
+  }
+
+  Widget _buildPasswordRequirementsBox() {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        border: Border.all(color: AppColors.gold.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _passwordRequirements.entries.map((entry) {
+          final isMet = entry.value;
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  isMet ? Icons.check_circle : Icons.cancel,
+                  color: isMet ? Colors.green : AppColors.gold.withOpacity(0.6),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  entry.key,
+                  style: TextStyle(
+                    color: isMet ? Colors.green : AppColors.gold.withOpacity(0.8),
+                    fontSize: 12,
+                    fontWeight: isMet ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }

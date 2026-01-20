@@ -57,6 +57,27 @@ class FormValidations {
     return passwordRegex.hasMatch(password);
   }
 
+  static String? validatePasswordMessage(String password) {
+    if (password.isEmpty) return 'La contraseña es requerida';
+    if (password.length < 8) return 'Mínimo 8 caracteres';
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return 'Se requiere una MAYÚSCULA';
+    if (!RegExp(r'[a-z]').hasMatch(password)) return 'Se requiere una minúscula';
+    if (!RegExp(r'\d').hasMatch(password)) return 'Se requiere un número';
+    if (!RegExp(r'[@$!%*?&]').hasMatch(password)) return 'Se requiere un carácter especial (@\$!%*?&)';
+    return null;
+  }
+
+  // Verificar requisitos individuales de contraseña
+  static Map<String, bool> getPasswordRequirements(String password) {
+    return {
+      '8 caracteres mínimo': password.length >= 8,
+      'Una MAYÚSCULA': RegExp(r'[A-Z]').hasMatch(password),
+      'Una minúscula': RegExp(r'[a-z]').hasMatch(password),
+      'Un número (0-9)': RegExp(r'\d').hasMatch(password),
+      'Carácter especial (@\$!%*?&)': RegExp(r'[@$!%*?&]').hasMatch(password),
+    };
+  }
+
   // Cédula: solo números, máximo 10 dígitos
   static bool isValidCedula(String cedula) {
     if (cedula.isEmpty) return false;

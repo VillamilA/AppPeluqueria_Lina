@@ -50,6 +50,13 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
   };
 
   bool _isSaving = false;
+  Map<String, bool> _passwordRequirements = {
+    '8 caracteres mínimo': false,
+    'Una MAYÚSCULA': false,
+    'Una minúscula': false,
+    'Un número (0-9)': false,
+    'Carácter especial (@\$!%*?&)': false,
+  };
 
   @override
   void initState() {
@@ -178,10 +185,10 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
         'password': passwordCtrl.text,
     };
 
-    // Email y role solo en creación
+    // Email solo en creación (NO incluir role para stylists)
     if (!widget.isEdit) {
       data['email'] = emailCtrl.text;
-      data['role'] = AdminConstants.ROLE_ESTILISTA;
+      // IMPORTANTE: NO incluir 'role' para estilistas, el endpoint POST /api/v1/stylists lo maneja automáticamente
     }
 
     // En creación, puede incluir workSchedule si lo desea
@@ -369,7 +376,20 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
                           _buildTextField(emailCtrl, 'Email', Icons.email),
                           SizedBox(height: 12),
                         ],
-                        _buildTextField(passwordCtrl, widget.isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña', Icons.lock, isPassword: true),
+                        _buildPasswordField(
+                          passwordCtrl,
+                          widget.isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña',
+                          Icons.lock,
+                          onChanged: () {
+                            setState(() {
+                              _passwordRequirements = FormValidations.getPasswordRequirements(passwordCtrl.text);
+                            });
+                          },
+                        ),
+                        if (passwordCtrl.text.isNotEmpty) ...[
+                          SizedBox(height: 12),
+                          _buildPasswordRequirementsBox(),
+                        ],
                         SizedBox(height: 12),
                         _buildTextField(confirmPasswordCtrl, 'Confirmar contraseña', Icons.lock_outline, isPassword: true),
                       ],
@@ -531,6 +551,75 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
         filled: true,
         fillColor: Colors.grey[850],
         contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    VoidCallback? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      keyboardType: TextInputType.text,
+      onChanged: (_) => onChanged?.call(),
+      style: TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+        prefixIcon: Icon(icon, color: AppColors.gold.withOpacity(0.7), size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.gold, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.grey[850],
+        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      ),
+    );
+  }
+
+  Widget _buildPasswordRequirementsBox() {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        border: Border.all(color: AppColors.gold.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _passwordRequirements.entries.map((entry) {
+          final isMet = entry.value;
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  isMet ? Icons.check_circle : Icons.cancel,
+                  color: isMet ? Colors.green : AppColors.gold.withOpacity(0.6),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  entry.key,
+                  style: TextStyle(
+                    color: isMet ? Colors.green : AppColors.gold.withOpacity(0.8),
+                    fontSize: 12,
+                    fontWeight: isMet ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
