@@ -52,8 +52,8 @@ class FormValidations {
   }
 
   static bool isValidPassword(String password) {
-    // Mínimo 8 caracteres, mayúscula, minúscula, número, carácter especial
-    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
+    // Mínimo 8 caracteres, mayúscula, minúscula, número, carácter especial (cualquiera)
+    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s])[^\s]{8,}$');
     return passwordRegex.hasMatch(password);
   }
 
@@ -63,7 +63,7 @@ class FormValidations {
     if (!RegExp(r'[A-Z]').hasMatch(password)) return 'Se requiere una MAYÚSCULA';
     if (!RegExp(r'[a-z]').hasMatch(password)) return 'Se requiere una minúscula';
     if (!RegExp(r'\d').hasMatch(password)) return 'Se requiere un número';
-    if (!RegExp(r'[@$!%*?&]').hasMatch(password)) return 'Se requiere un carácter especial (@\$!%*?&)';
+    if (!RegExp(r'[^\w\s]').hasMatch(password)) return 'Se requiere un carácter especial (.#\$%! etc)';
     return null;
   }
 
@@ -74,7 +74,7 @@ class FormValidations {
       'Una MAYÚSCULA': RegExp(r'[A-Z]').hasMatch(password),
       'Una minúscula': RegExp(r'[a-z]').hasMatch(password),
       'Un número (0-9)': RegExp(r'\d').hasMatch(password),
-      'Carácter especial (@\$!%*?&)': RegExp(r'[@$!%*?&]').hasMatch(password),
+      'Carácter especial (.#\$%! etc)': RegExp(r'[^\w\s]').hasMatch(password),
     };
   }
 

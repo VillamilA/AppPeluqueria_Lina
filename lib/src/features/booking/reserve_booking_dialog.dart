@@ -780,9 +780,14 @@ class _ReserveBookingDialogState extends State<ReserveBookingDialog> {
                 onPressed: () {
                   Navigator.of(context).pop(); // Cierra success dialog
                   Navigator.of(context).pop(true); // Cierra reserve dialog
+                  // Navegar al dashboard
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/dashboard',
+                    (route) => false,
+                  );
                 },
                 child: Text(
-                  'Volver a servicios',
+                  'Ir al Dashboard',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),

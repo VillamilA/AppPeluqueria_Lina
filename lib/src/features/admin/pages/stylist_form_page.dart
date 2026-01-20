@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
+import '../../../api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../common/dialogs/app_dialogs.dart';
 import '../admin_constants.dart';
@@ -37,6 +38,9 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
   late Animation<double> _fadeAnimation;
 
   // Catalogs management is now in separate page
+  List<String> _selectedCatalogIds = [];
+  List<dynamic> _availableCatalogs = [];
+  bool _loadingCatalogs = false;
 
   // Schedule (work hours)
   final Map<String, List<String>> _workSchedule = {
@@ -94,9 +98,39 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
       _animController.forward();
       
       print('✅ Todos los controllers inicializados correctamente');
+      
+      // Cargar catálogos disponibles en segundo plano
+      if (!widget.isEdit) {
+        _loadAvailableCatalogs();
+      }
     } catch (e) {
       print('❌ Error al inicializar controllers: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _loadAvailableCatalogs() async {
+    try {
+      setState(() => _loadingCatalogs = true);
+      final res = await ApiClient.instance.get('/api/v1/catalog?includeServices=true');
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final catalogs = data is Map ? (data['data'] ?? []) : (data is List ? data : []);
+        
+        if (mounted) {
+          setState(() {
+            _availableCatalogs = catalogs;
+            _loadingCatalogs = false;
+          });
+        }
+        print('✅ Catálogos cargados: ${catalogs.length}');
+      }
+    } catch (e) {
+      print('❌ Error cargando catálogos: $e');
+      if (mounted) {
+        setState(() => _loadingCatalogs = false);
+      }
     }
   }
 
@@ -189,6 +223,11 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
     if (!widget.isEdit) {
       data['email'] = emailCtrl.text;
       // IMPORTANTE: NO incluir 'role' para estilistas, el endpoint POST /api/v1/stylists lo maneja automáticamente
+      
+      // Incluir catálogos seleccionados si los hay
+      if (_selectedCatalogIds.isNotEmpty) {
+        data['catalogs'] = _selectedCatalogIds;
+      }
     }
 
     // En creación, puede incluir workSchedule si lo desea
@@ -395,6 +434,12 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
                       ],
                     ),
                   ),
+
+                  // SELECCIONAR CATÁLOGOS (solo en creación)
+                  if (!widget.isEdit) ...[
+                    SizedBox(height: 16),
+                    _buildCatalogsButton(),
+                  ],
 
                   if (widget.isEdit) ...[
                     SizedBox(height: 16),
@@ -620,6 +665,125 @@ class _StylistFormPageState extends State<StylistFormPage> with SingleTickerProv
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCatalogsButton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gold.withOpacity(0.3), width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _loadingCatalogs ? null : _showCatalogsDialog,
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.style, color: AppColors.gold, size: 22),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Catálogos',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        _selectedCatalogIds.isEmpty
+                            ? 'Selecciona los catálogos disponibles'
+                            : '${_selectedCatalogIds.length} catálogo(s) seleccionado(s)',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_loadingCatalogs)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.gold),
+                    ),
+                  )
+                else
+                  Icon(Icons.arrow_forward_ios, color: AppColors.gold, size: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCatalogsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.charcoal,
+        title: Text('Seleccionar Catálogos', style: TextStyle(color: AppColors.gold)),
+        content: SingleChildScrollView(
+          child: _availableCatalogs.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'No hay catálogos disponibles',
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _availableCatalogs.map((catalog) {
+                    final catalogId = catalog['_id']?.toString() ?? '';
+                    final catalogName = catalog['nombre']?.toString() ?? 'Sin nombre';
+                    final isSelected = _selectedCatalogIds.contains(catalogId);
+
+                    return CheckboxListTile(
+                      title: Text(catalogName, style: TextStyle(color: Colors.white)),
+                      subtitle: Text(
+                        catalog['descripcion']?.toString() ?? '',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      value: isSelected,
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedCatalogIds.add(catalogId);
+                          } else {
+                            _selectedCatalogIds.remove(catalogId);
+                          }
+                        });
+                        Navigator.pop(ctx);
+                        _showCatalogsDialog(); // Mostrar nuevamente para continuidad UX
+                      },
+                      activeColor: AppColors.gold,
+                      checkColor: Colors.black87,
+                    );
+                  }).toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cerrar', style: TextStyle(color: AppColors.gold)),
+          ),
+        ],
       ),
     );
   }

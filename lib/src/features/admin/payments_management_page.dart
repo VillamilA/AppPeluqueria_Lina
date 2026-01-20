@@ -127,6 +127,25 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
         }
         print('📊 RESUMEN: $amountGreaterThanZero con monto, $amountIsZero sin monto');
         
+        // 🆕 SEGUNDO PASE: Para pagos que siguen con amount=0, intentar GET directo del booking
+        for (int i = 0; i < rawPayments.length; i++) {
+          final payment = rawPayments[i];
+          final currentAmount = payment['amount'] ?? 0.0;
+          
+          if ((currentAmount as num) == 0) {
+            final bookingId = payment['bookingId'];
+            if (bookingId != null && (bookingId as String).isNotEmpty) {
+              final amount = await _getBookingAmount(bookingId);
+              if (amount > 0) {
+                payment['amount'] = amount;
+                amountIsZero--;
+                amountGreaterThanZero++;
+              }
+            }
+          }
+        }
+        print('📊 RESUMEN FINAL: $amountGreaterThanZero con monto, $amountIsZero sin monto');
+        
         if (mounted) {
           setState(() {
             payments = rawPayments;
@@ -222,6 +241,35 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
               price = (bookingData['service']['precio'] as num).toDouble();
               print('   💰 Precio encontrado en service.precio: $price');
             }
+            // Intento 5: Si aún no hay precio, buscar por nombre del servicio
+            else if (price == null && payment.containsKey('serviceName') && payment['serviceName'] != null) {
+              print('   🔎 Buscando servicio por nombre: "${payment["serviceName"]}"');
+              try {
+                final serviceRes = await ApiClient.instance.get(
+                  '/api/v1/services?search=${Uri.encodeComponent(payment["serviceName"])}',
+                  headers: {'Authorization': 'Bearer ${widget.token}'},
+                ).timeout(Duration(seconds: 3));
+                
+                if (serviceRes.statusCode == 200) {
+                  final serviceData = jsonDecode(serviceRes.body);
+                  final services = serviceData['data'] ?? serviceData;
+                  
+                  if (services is List && services.isNotEmpty) {
+                    final matchingService = services.firstWhere(
+                      (s) => (s['nombre'] ?? '').toString().toLowerCase() == payment["serviceName"].toString().toLowerCase(),
+                      orElse: () => services[0], // Fallback al primero si no hay match exacto
+                    );
+                    
+                    if (matchingService['precio'] != null) {
+                      price = (matchingService['precio'] as num).toDouble();
+                      print('   💰 Precio encontrado en catálogo de servicios: $price');
+                    }
+                  }
+                }
+              } catch (e) {
+                print('   ⚠️ Error buscando en catálogo: $e');
+              }
+            }
             
             // ✅ PASO 6: Validar que el precio es válido
             if (price != null && price > 0) {
@@ -260,6 +308,63 @@ class _PaymentsManagementPageState extends State<PaymentsManagementPage>
     print('📊 TOTAL DE PAGOS CON MONTO: $paymentsWithAmount');
   }
 
+  /// 🆕 FUNCIÓN: Obtener precio del booking obteniendo el servicio
+  Future<double> _getBookingAmount(String bookingId) async {
+    try {
+      final res = await ApiClient.instance.get(
+        '/api/v1/bookings/$bookingId',
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      ).timeout(Duration(seconds: 5));
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        
+        if (data['precio'] != null && (data['precio'] as num) > 0) {
+          return (data['precio'] as num).toDouble();
+        }
+        if (data['price'] != null && (data['price'] as num) > 0) {
+          return (data['price'] as num).toDouble();
+        }
+        if (data['total'] != null && (data['total'] as num) > 0) {
+          return (data['total'] as num).toDouble();
+        }
+        if (data['servicePrice'] != null && (data['servicePrice'] as num) > 0) {
+          return (data['servicePrice'] as num).toDouble();
+        }
+        
+        // Obtener precio del servicio
+        if (data['servicioId'] != null && (data['servicioId'] as String).isNotEmpty) {
+          try {
+            final serviceRes = await ApiClient.instance.get(
+              '/api/v1/services/${data["servicioId"]}',
+              headers: {'Authorization': 'Bearer ${widget.token}'},
+            ).timeout(Duration(seconds: 5));
+            
+            if (serviceRes.statusCode == 200) {
+              final serviceData = jsonDecode(serviceRes.body);
+              
+              if (serviceData['precio'] != null && (serviceData['precio'] as num) > 0) {
+                return (serviceData['precio'] as num).toDouble();
+              }
+              if (serviceData['price'] != null && (serviceData['price'] as num) > 0) {
+                return (serviceData['price'] as num).toDouble();
+              }
+              if (serviceData['costo'] != null && (serviceData['costo'] as num) > 0) {
+                return (serviceData['costo'] as num).toDouble();
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error obteniendo servicio: $e');
+          }
+        }
+      }
+      
+      return 0.0;
+    } catch (e) {
+      print('❌ Error en _getBookingAmount: $e');
+      return 0.0;
+    }
+  }
 
   Future<void> _fetchClients() async {
     try {

@@ -352,9 +352,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                                   child: _buildCompactFilter(
                                     'Estado',
                                     filterStatus,
-                                    ['ALL', 'SCHEDULED', 'CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'],
-                                    ['Todas', 'Programadas', 'Reservadas', 'Completadas', '❌ No Asistí', 'Canceladas'],
-                                    [Colors.white, Colors.orange, AppColors.gold, Colors.green, Colors.purple, Colors.red],
+                                    ['ALL', 'PENDING_STYLIST_CONFIRMATION', 'CONFIRMED', 'COMPLETED', 'CANCELLED'],
+                                    ['Todas', 'Por aprobar', 'Confirmadas', 'Completadas', 'Canceladas'],
+                                    [Colors.white, Colors.orange, AppColors.gold, Colors.green, Colors.red],
                                     (value) {
                                       setState(() {
                                         filterStatus = value;
@@ -904,8 +904,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   void _showBankInfoDialog(String bookingId, Map<String, dynamic> bankInfo, dynamic amount) {
     final bank = bankInfo['bank'] ?? '';
     final accountType = bankInfo['accountType'] ?? '';
-    final accountNumber = bankInfo['accountNumber'] ?? '';
-    final accountHolder = bankInfo['accountHolder'] ?? '';
+    final accountNumber = '2210568629'; // Número de cuenta de Lina Hernandez
+    final accountHolder = 'Lina Hernandez'; // Titular de la cuenta
     final reference = bankInfo['reference'] ?? '';
 
     showDialog(
