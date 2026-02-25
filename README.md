@@ -1,6 +1,6 @@
 # Peluquería Lina - Aplicación Móvil
 
-**Desarrollado por:** Angel Vilamil
+**Desarrollado por:** Angel Vilamil   [![Descargar](https://img.shields.io/badge/Descargar-Itch.io-red?style=for-the-badge)](https://avillamil.itch.io/lina-peluqueria)
 
 **Fecha de Actualización:** Enero 2026
 
